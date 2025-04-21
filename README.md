@@ -4,7 +4,7 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 
 ## 🌐 Live Demo
 
-👉 [Check it out on Hugging Face Spaces](https://huggingface.co/spaces/yourusername/movie-recommender)
+👉 [Check it out on Hugging Face Spaces](https://huggingface.co/spaces/JJTsao/RAG_Movie_Recommendation_Assistant)
 
 ---
 
