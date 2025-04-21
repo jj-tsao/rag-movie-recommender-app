@@ -1,6 +1,6 @@
 # 🎬 RAG Movie Recommender
 
-An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with LangChain, OpenAI embeddings/ LLM, QDrant vectorDB, and Gradio. Deployed on Hugging Face Spaces.
+An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models, QDrant vectorDB, TMDI API, and Gradio. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
@@ -25,12 +25,12 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 
 ## 🛠️ Tech Stack
 
-- **LangChain** – Retrieval-augmented generation framework
 - **OpenAI** – Embedding model and chat LLM provider
 - **QDrant** – Vector database with hybrid search capabilities
 - **Gradio** – Web UI interface library
 - **Hugging Face Spaces** – Deployment platform
 - **QDrant Cloud** – Hosting vector dataset
+- **TMDB API** – Provider of movie data
 
 ---
 
@@ -70,9 +70,12 @@ python app.py
 ## 📂 Folder Structure
 
 ```
-├── app.py                  # Main frontend app
-├── chatbot.py              # LangChain RAG logic and OpenAI LLM chatbot setup
-├── retriever.py            # QDrant retriever logic
+├── app.py                  # Main startup point for the app
+├── ui.py                   # Frontend UI rendering with Gradio
+├── chatbot.py              # LLM chatbot, memory, and context retrieval setup
+├── rag-pipeline.py         # Movie data retrieval and reranking logic
+├── llm_utils.py            # OpenAI embedding & LLM utility functions
+├── vectorestore.py         # QDrant client utily function
 ├── config.py               # Configurations for environment variables
 ├── .env.example            # Environment variable template
 └── requirements.txt        # Python dependencies
@@ -80,18 +83,13 @@ python app.py
 
 ---
 
-## 📸 Screenshots
-
-<!-- WIP -->
-
----
-
 ## 🧠 How It Works
 
-1. User types a natural language query.
-2. LangChain retrieves relevant movie chunks from QDrant using semantic and scalar filters.
+1. User types a natural language query and apply optional filters (genres, streaming services, release year).
+2. The app retrieves relevant movie chunks from QDrant and reranks the results based on rating and popularity score.
 3. OpenAI generates a recommendation with natural response based on retrieved content.
 4. The app displays results through an interactive chatbot UI with Gradio.
+5. User can contintue the conversation to refine the results or ask for new recommendation
 
 ---
 
