@@ -9,7 +9,7 @@ class MovieRetriever:
         qdrant_client: QdrantClient,
         collection_name: str,
         popularity_weight: float = 0.4,  # Weight for popularity score boost during reranking
-        rating_weight: float = 0.6,  # Weight for rating score boost durign reranking
+        rating_weight: float = 0.6,  # Weight for rating score boost during reranking
         retrieval_limit: int = 300,  # Number of movies to retrieve for reranking
         top_k: int = 20,  # Number of post-reranking movies to send to LLM
     ):
@@ -40,7 +40,7 @@ class MovieRetriever:
                 FieldCondition(
                 key="release_year",
                 range=Range(gte=year_range[0], lte=year_range[1])
-            )
+                )
             )
 
         qdrant_filter = Filter(must=must_clauses) if must_clauses else None
@@ -61,8 +61,9 @@ class MovieRetriever:
         # Rerank initial results
         reranked = self.rerank(hits)
         
-        # Return top K results post-reranking
+        # Return top_k post-reranking results 
         return reranked[:self.top_k]
+
 
     def rerank(self, hits) -> List[dict]:
         scored_docs = []
@@ -71,10 +72,12 @@ class MovieRetriever:
 
         max_popularity = max((float(payload.get("popularity", 0)) for payload in payloads), default=800)
 
+        # Construct reranking scores
         for payload in payloads:
             popularity = float(payload.get("popularity", 0))
             vote_average = float(payload.get("vote_average", 0))
 
+            # Normalize popularity and rating
             norm_pop = popularity / max_popularity if max_popularity else 0
             norm_rating = vote_average / 10
 
@@ -87,6 +90,7 @@ class MovieRetriever:
 
         scored_docs.sort(key=lambda x: x[1], reverse=True)
         return [payload for payload, _ in scored_docs]
+    
     
     def format_context(self, movies: list[dict]) -> str:
         return "\n\n".join([

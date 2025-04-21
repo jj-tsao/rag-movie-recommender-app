@@ -34,7 +34,6 @@ def create_interface():
             chatbot = gr.Chatbot(
                 placeholder="<div style='text-align: center;'><h3><strong>Your Personal Movie Curator - Powered by AI</strong></h3>Tell me the movie vibe you're looking for 🍿<br>Like: Dark comedies with unexpected endings, moral ambiguity, and reflections on modern society</div>",
             )
-
             gr.ChatInterface(
                 fn=chat,
                 type="messages",
