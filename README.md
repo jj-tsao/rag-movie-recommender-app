@@ -1,6 +1,6 @@
 # 🎬 RAG Movie Recommender
 
-An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models, QDrant vectorDB, TMDI API, and Gradio. Deployed on Hugging Face Spaces.
+An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models, QDrant vectorDB semantic hybrid search, TMDB API, and Gradio UI. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
@@ -10,16 +10,16 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 
 ## 🔗 Related Project
 
-👉 Pipeline for Data Fetching/Embedding: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
+👉 Data Pipeline for Movie Fetching/Embedding: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
 
 ---
 ## 📌 Features
 
-- 🎯 **Hybrid Semantic Search + Scalar Boosting:** Recommend movies based on natural language queries using hybrid semantic search and scalar value boosting (e.g., rating, popularity)
-- 🔎 **Scalar Value Filtering:** Refine movie recommendations based on filter input from users (e.g., genres, streaming services, release years)
-- 🧠 **RAG with LangChain + QDrant:** Combines vector search and LLM for intelligent responses
+- 🧠 **Retrieval Augmented Generation (RAG):** Combine real-time vector search and LLM for intelligent responses
+- 🎯 **Hybrid Semantic Search + Scalar Boosting:** Recommend movies based on natural language queries using hybrid semantic search and scalar value boost through reranking (e.g., rating, popularity)
+- 🔎 **Content Filtering:** Refine movie recommendations based on filter input from users (e.g., genres, streaming services, release year)
 - 📊 **Dynamic Search UI:** Built with Gradio for fast and interactive querying
-- ☁️ **Serverless Ready:** Loads vector DB from QDrant Cloud at runtime
+- ☁️ **Serverless Ready:** Retrieve up-to-date movie data from QDrant Cloud vectorDB at runtime
 
 ---
 
@@ -30,7 +30,7 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 - **Gradio** – Web UI interface library
 - **Hugging Face Spaces** – Deployment platform
 - **QDrant Cloud** – Hosting vector dataset
-- **TMDB API** – Provider of movie data
+- **TMDB API** – Movie data API provider
 
 ---
 
