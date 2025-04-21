@@ -15,22 +15,21 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 ---
 ## 📌 Features
 
-- 🧠 **Retrieval Augmented Generation (RAG):** Combine real-time vector search and LLM for intelligent responses
-- 🎯 **Hybrid Semantic Search + Scalar Boosting:** Recommend movies based on natural language queries using hybrid semantic search and scalar value boost through reranking (e.g., rating, popularity)
-- 🔎 **Content Filtering:** Refine movie recommendations based on filter input from users (e.g., genres, streaming services, release year)
+- 🧠 **Retrieval Augmented Generation (RAG):** Combines real-time vector search and LLM for intelligent responses
+- 🎯 **Hybrid Semantic Search & Scalar Boosting:** Recommends movies based on natural language queries using hybrid semantic search and scalar boost reranking (e.g., rating, popularity) 
+- 🔎 **Interactive Filtering:** Refines movie recommendation with filters based on user input (e.g., genres, streaming services, release years)
+- ☁️ **Serverless Ready:** Retrieves up-to-date movie data from QDrant Cloud vectorDB at runtime
 - 📊 **Dynamic Search UI:** Built with Gradio for fast and interactive querying
-- ☁️ **Serverless Ready:** Retrieve up-to-date movie data from QDrant Cloud vectorDB at runtime
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **OpenAI** – Embedding model and chat LLM provider
-- **QDrant** – Vector database with hybrid search capabilities
+- **OpenAI** – Embedding model and LLM provider
+- **QDrant** – Cloud-based vector database for real-time hybrud search
 - **Gradio** – Web UI interface library
-- **Hugging Face Spaces** – Deployment platform
-- **QDrant Cloud** – Hosting vector dataset
 - **TMDB API** – Movie data API provider
+- **Hugging Face Spaces** – Deployment platform
 
 ---
 
@@ -72,12 +71,11 @@ python app.py
 ```
 ├── app.py                  # Main startup point for the app
 ├── ui.py                   # Frontend UI rendering with Gradio
-├── chatbot.py              # LLM chatbot, memory, and context retrieval setup
-├── rag-pipeline.py         # Movie data retrieval and reranking logic
+├── chatbot.py              # LLM chatbot, memory, and content retrieval setup
+├── rag-pipeline.py         # Movie data search and reranking logic
 ├── llm_utils.py            # OpenAI embedding & LLM utility functions
-├── vectorestore.py         # QDrant client utily function
+├── vectorestore.py         # QDrant client utily functions
 ├── config.py               # Configurations for environment variables
-├── .env.example            # Environment variable template
 └── requirements.txt        # Python dependencies
 ```
 
@@ -85,11 +83,11 @@ python app.py
 
 ## 🧠 How It Works
 
-1. User types a natural language query and apply optional filters (genres, streaming services, release year).
-2. The app retrieves relevant movie chunks from QDrant and reranks the results based on rating and popularity score.
+1. User types a natural language query and apply optional filters (genres, streaming services, release years).
+2. App retrieves relevant movie chunks from QDrant and reranks the chunks based on rating and popularity boost.
 3. OpenAI generates a recommendation with natural response based on retrieved content.
-4. The app displays results through an interactive chatbot UI with Gradio.
-5. User can contintue the conversation to refine the results or ask for new recommendation
+4. App displays results through an interactive chatbot UI with Gradio.
+5. User can contintue the conversation to refine the results or ask for new recommendations
 
 ---
 
