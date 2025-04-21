@@ -1,6 +1,6 @@
 # 🎬 RAG Movie Recommender
 
-An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models, Qdrant vectorDB semantic hybrid search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
+An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models (LLM), Qdrant vectorDB semantic search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
@@ -16,18 +16,18 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 ## 📌 Features
 
 - 🧠 **Retrieval Augmented Generation (RAG):** Combines real-time vector search and LLM for intelligent recommendations and responses
-- 🎯 **Hybrid Semantic Search & Scalar Value Reranking:** Recommends movies based on natural language queries using semantic search and reranking based on scalar values (rating, popularity) 
-- 🔎 **Interactive Filtering:** Refines movie recommendation with filters based on user input (genres, streaming services, release years)
-- ☁️ **Serverless Ready:** Retrieves up-to-date movie vector data from Qdrant Cloud vectorDB at runtime
+- 🎯 **Hybrid Semantic Search & Scalar Value Reranking:** Recommends movies based on natural language input using semantic search and reranking with scalar values (rating, popularity) 
+- 🔎 **Interactive Filtering:** Refines movie recommendation with filters based on user's input (genres, streaming services, release years)
+- ☁️ **Serverless Ready:** Retrieves up-to-date movie data from Qdrant Cloud vectorDB at runtime
 - 📊 **Dynamic Search UI:** Built with Gradio for fast and interactive querying
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **OpenAI** – Embedding model and LLM provider
+- **OpenAI** – LLM and embedding model provider
 - **Qdrant** – Cloud-based vector database for data retrieval at runtime
-- **Gradio** – Web UI interface library
+- **Gradio** – Web app UI library
 - **TMDB API** – Movie data API provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
 - **Hugging Face Spaces** – Deployment platform
 
@@ -71,9 +71,9 @@ python app.py
 ```
 ├── app.py                  # Main startup point for the app
 ├── ui.py                   # Frontend UI rendering with Gradio
-├── chatbot.py              # LLM chatbot, memory, and content retrieval setup
-├── rag-pipeline.py         # Movie data search and reranking pipeline
-├── llm_utils.py            # OpenAI Embedding & LLM utility functions
+├── chatbot.py              # LLM chatbot, memory, and intent classification setup
+├── rag-pipeline.py         # Movie data retrieval and reranking pipeline
+├── llm_utils.py            # OpenAI embedding & LLM utility functions
 ├── vectorestore.py         # Qdrant client utily functions
 ├── config.py               # Configurations for environment variables
 └── requirements.txt        # Python dependencies
@@ -84,7 +84,7 @@ python app.py
 ## 🧠 How It Works
 
 1. User types a natural language query and apply optional filters (genres, streaming services, release years).
-2. App retrieves relevant movie chunks from Qdrant and reranks the results based on rating and popularity scores.
+2. App retrieves relevant movie chunks from Qdrant, and reranks the results based on rating and popularity scores.
 3. OpenAI generates a recommendation with natural language response based on retrieved content.
 4. App displays results through an interactive chatbot UI with Gradio.
 5. User contintues the conversation to refine the result or ask for new recommendations
