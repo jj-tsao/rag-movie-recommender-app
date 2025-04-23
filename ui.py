@@ -2,6 +2,7 @@ import gradio as gr
 from chatbot import chat
 from gradio_rangeslider import RangeSlider
 
+
 dark_mode = """
 function refresh() {
     const url = new URL(window.location);
@@ -24,7 +25,7 @@ def create_interface():
                 multiselect=True,
             )
             provider_input = gr.Dropdown(
-                choices=["Netflix", "Hulu", "Disney Plus", "Max", "Amazon Prime Video", "Apple TV+", "Paramount Plus", "Paramount+ with Showtime", "Peacock Premium", "Crunchyroll", "MGM Plus", "fuboTV", "Starz", "AMC+", "Sling TV", "Philo"],
+                choices=["Netflix", "Hulu", "Max", "Amazon Prime Video", "Disney Plus", "Apple TV+", "Paramount Plus", "Paramount+ with Showtime", "Peacock Premium", "Crunchyroll", "MGM Plus", "fuboTV", "Starz", "AMC+", "Sling TV", "Philo"],
                 label="Filter by Streaming Services",
                 multiselect=True,
             )
@@ -33,6 +34,7 @@ def create_interface():
         with gr.Column():
             chatbot = gr.Chatbot(
                 placeholder="<div style='text-align: center;'><h3><strong>Your Personal Movie Curator - Powered by AI</strong></h3>Tell me the movie vibe you're looking for 🍿<br>Like: Dark comedies with unexpected endings, moral ambiguity, and reflections on modern society</div>",
+                type="messages",
             )
             gr.ChatInterface(
                 fn=chat,
@@ -40,5 +42,4 @@ def create_interface():
                 chatbot=chatbot,
                 additional_inputs=[genre_input, provider_input, year_range]
             )
-
     return demo

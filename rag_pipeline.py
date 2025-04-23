@@ -23,7 +23,7 @@ class MovieRetriever:
     def embed(self, query: str, embed_fn) -> List[float]:
         return embed_fn(query)
 
-    def retrieve(self, query_vector: List[float], genres=None, providers=None, year_range=None) -> List[dict]:
+    def retrieve_and_rerank(self, query_vector: List[float], genres=None, providers=None, year_range=None) -> List[dict]:
         # Construct Qdrant filter based on user input
         must_clauses = []
 
@@ -50,7 +50,7 @@ class MovieRetriever:
             collection_name=self.collection_name,
             query=query_vector,
             query_filter=qdrant_filter,
-            limit=self.retrieval_limit,
+            limit=self.retrieval_limit,  # Number of movies for reranking
             with_payload=True,
             with_vectors=False,
         )
@@ -58,10 +58,8 @@ class MovieRetriever:
         if not hits:
             return []
         
-        # Rerank initial results
+        # Rerank initial results and return top_k movies
         reranked = self.rerank(hits)
-        
-        # Return top_k post-reranking results 
         return reranked[:self.top_k]
 
 
@@ -72,12 +70,11 @@ class MovieRetriever:
 
         max_popularity = max((float(payload.get("popularity", 0)) for payload in payloads), default=800)
 
-        # Construct reranking scores
+        # Construct reranking scores with popularity and rating
         for payload in payloads:
             popularity = float(payload.get("popularity", 0))
             vote_average = float(payload.get("vote_average", 0))
 
-            # Normalize popularity and rating
             norm_pop = popularity / max_popularity if max_popularity else 0
             norm_rating = vote_average / 10
 
@@ -88,11 +85,12 @@ class MovieRetriever:
 
             scored_docs.append((payload, combined_score))
 
+        # Rerank by combined score and return results
         scored_docs.sort(key=lambda x: x[1], reverse=True)
         return [payload for payload, _ in scored_docs]
     
     
-    def format_context(self, movies: list[dict]) -> str:
+    def format_context(self, movies: list[dict]) -> str:  # Formart the retrieved content for LLM consumption
         return "\n\n".join([
             f"  {movie.get('content', '')}"
             for movie in movies

@@ -1,3 +1,4 @@
+python-dotenv
 qdrant-client
 openai
 gradio
