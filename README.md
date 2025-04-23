@@ -54,6 +54,7 @@ pip install -r requirements.txt
 Create a `.env` file:
 ```
 OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
 QDRANT_API_KEY=your_qdrant_key
 QDRANT_ENDPOINT=https://your-qdrant-endpoint_url
 QDRANT_COLLECTION_NAME=your_qdrant_collection_name
