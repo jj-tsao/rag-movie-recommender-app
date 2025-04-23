@@ -16,7 +16,7 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 ## 📌 Features
 
 - 🧠 **Retrieval Augmented Generation (RAG):** Combines real-time vector search and LLM for intelligent recommendations and responses
-- 🎯 **Hybrid Search Pipeline:** Recommends movies based on natural language input combinind semantic search, reranking by scalar metata (rating, popularity)
+- 🎯 **Hybrid Search & Reranking Pipeline:** Recommends movies based on natural language input combining semantic search and reranking by scalar metata (rating, popularity)
 - 🔎 **Interactive Filtering:** Refines movie recommendation with filters based on user's input (genres, streaming services, release years)
 - ☁️ **Serverless Ready:** Retrieves up-to-date movie data from Qdrant Cloud vectorDB at runtime
 - 📊 **Dynamic Search UI:** Built with Gradio for fast and interactive querying
