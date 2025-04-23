@@ -4,7 +4,7 @@ from vectorstore import connect_qdrant
 from config import QDRANT_ENDPOINT, QDRANT_API_KEY, QDRANT_COLLECTION_NAME
 
 
-def chat(question, history, genres=None, providers=None, year_range=None, model_provider="openai"):  # If using Anthropi LLM, set model_provider="anthropic". Defaults to "openai".
+def chat(question, history, genres=None, providers=None, year_range=None, model_provider="openai"):  # Set model_provider="anthropic" f using Anthropic LLM for chat completions. Defaults to "openai".
     # Check if the user input is empty
     if not question or question.strip() == "":
         return "Hi there! What are you in the mood for today? 🎥"
