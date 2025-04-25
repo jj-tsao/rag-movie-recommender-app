@@ -1,6 +1,6 @@
 # 🎬 RAG Movie Recommender
 
-An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models (LLM), Qdrant vectorDB semantic search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
+An AI-powered movie and TV recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models (LLM), Qdrant vectorDB semantic search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
@@ -30,14 +30,14 @@ An AI-powered movie recommendation app using Retrieval-Augmented Generation (RAG
 - **TMDB API** – Movie data API provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
 - **Gradio** – Web app UI library
 - **Hugging Face Spaces** – Deployment platform
-- **Anthropic** - Alternative chat LLM provider
+- **Anthropic** - Intent classification and alternative chat LLM provider
 
 ---
 
 ## 🧠 How It Works
 
 1. User types a natural language query and apply optional filters (genres, streaming services, release years).
-2. App retrieves relevant movie chunks from Qdrant, and reranks the results based on movie rating and popularity.
+2. App retrieves relevant movie or TV chunks from Qdrant, and reranks the results based on review rating and popularity.
 3. OpenAI generates a recommendation with natural language response based on retrieved content.
 4. App displays results through an interactive chatbot UI with Gradio.
 5. User contintues the conversation to refine the result or ask for new recommendations.
