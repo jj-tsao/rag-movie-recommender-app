@@ -1,6 +1,6 @@
-# 🎬 RAG Movie Recommender
+# 🎬 RAG Movie & TV Recommender
 
-An AI-powered movie and TV recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models (LLM), Qdrant vectorDB semantic search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
+An AI-powered movie and TV show recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models (LLM), Qdrant vectorDB semantic search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
