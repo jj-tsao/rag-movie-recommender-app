@@ -1,5 +1,4 @@
 import gradio as gr
-from chatbot import chat
 from gradio_rangeslider import RangeSlider
 
 
@@ -14,13 +13,49 @@ function refresh() {
 """
 
 
-def create_interface():
-    with gr.Blocks(js=dark_mode) as demo:
+def create_interface(chat_fn):
+    movie_genres = [
+        "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family",
+        "Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction",
+        "TV Movie", "Thriller", "War", "Western"
+    ]
+
+    tv_genres = [
+        "Action & Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family",
+        "Kids", "Mystery", "News", "Reality", "Sci-Fi & Fantasy", "Soap", "Talk", "War & Politics", "Western"
+    ]
+
+    def update_genres(media_type):
+        return gr.update(
+            choices=movie_genres if media_type == "Movies" else tv_genres,
+            value=[]
+        )
+    
+    with gr.Blocks(fill_height=True, js=dark_mode, css="""
+    .message-wrap {
+    overflow-anchor: none;
+    }
+    .message-wrap:last-child {
+    overflow-anchor: auto;
+    }
+    .chat-container {
+    scroll-behavior: smooth;
+    }
+    .messages-wrapper {
+    min-height: 400px;
+    }
+    """) as demo:
         gr.Markdown("## 🎬 Movie Recommendation Assistant")
 
         with gr.Row():
+            media_type_input = gr.Dropdown(
+                choices=["Movies", "TV Shows"],
+                value="Movies",
+                label="Media Type",
+                multiselect=False,
+            )
             genre_input = gr.Dropdown(
-                choices=["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "history", "Horror", "Music", "Mystery", "Romance", "Science Fiction", "TV Movie", "Thriller", "War", "Western"],
+                choices=movie_genres,
                 label="Filter by Genres",
                 multiselect=True,
             )
@@ -29,17 +64,34 @@ def create_interface():
                 label="Filter by Streaming Services",
                 multiselect=True,
             )
-            year_range = RangeSlider(minimum=1920, maximum=2025, value=(1920, 2025), step=1, label="Release Year")
+            year_range = RangeSlider(minimum=1920, maximum=2025, value=(1920, 2025), step=1, label="Release Year", scale=2)
 
+        media_type_input.change(
+            fn=update_genres,
+            inputs=media_type_input,
+            outputs=genre_input
+        )
+        
         with gr.Column():
             chatbot = gr.Chatbot(
                 placeholder="<div style='text-align: center;'><h3><strong>Your Personal Movie Curator - Powered by AI</strong></h3>Tell me the movie vibe you're looking for 🍿<br>Like: Dark comedies with unexpected endings, moral ambiguity, and reflections on modern society</div>",
                 type="messages",
+                bubble_full_width=False,
             )
             gr.ChatInterface(
-                fn=chat,
+                fn=chat_fn,
                 type="messages",
                 chatbot=chatbot,
-                additional_inputs=[genre_input, provider_input, year_range]
-            )
+                additional_inputs=[media_type_input, genre_input, provider_input, year_range],
+                fill_height=True, 
+                css="""
+                .chatbot .message.markdown { 
+                    overflow-y: auto; 
+                    max-height: 500px; 
+                }
+                .markdown-content {
+                    transition: none !important;
+                }
+                """
+                    )
     return demo
