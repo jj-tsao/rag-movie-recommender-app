@@ -5,7 +5,7 @@ from ui import create_interface
 from config import QDRANT_ENDPOINT, QDRANT_API_KEY, QDRANT_MOVIE_COLLECTION_NAME, QDRANT_TV_COLLECTION_NAME
 
 
-if __name__ == "__main__":
+def main():
     # Persistent Qdrant connection and RAG retriever
     qdrant_client = connect_qdrant(endpoint=QDRANT_ENDPOINT, api_key=QDRANT_API_KEY)
     retriever = MovieRetriever(qdrant_client, QDRANT_MOVIE_COLLECTION_NAME, QDRANT_TV_COLLECTION_NAME)
@@ -16,3 +16,7 @@ if __name__ == "__main__":
     # Create and launch UI
     demo = create_interface(chat_fn)
     demo.launch(inbrowser=True, debug=True)
+
+
+if __name__ == "__main__":
+    main()

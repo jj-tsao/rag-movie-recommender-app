@@ -4,9 +4,15 @@ from llm_services import embed_text, classify_intent, call_chat_model_openai, ca
 
 
 def build_chat_fn(retriever):
-    def chat(question, history, media_type="movies", genres=None, providers=None, year_range=None, model_provider="openai"):  # Set model_provider="anthropic" if using Anthropic LLM for chat completions. Defaults to "openai".
+    def chat(question, history, media_type="movies", genres=None, providers=None, year_range=None):  
+        # Check whether user input is empty or whitespace
+        if not question.strip():
+            emoji = "🎥" if media_type.lower() == "movies" else "📺"
+            yield f"Hi there, what are you in the mood for today? {emoji}"
+            return
+      
         with ThreadPoolExecutor() as executor:
-                # Classify user intent to determine whether it is a recommendation ask
+                # Classify user intent to determine if it is a recommendation ask
                 intent_future = executor.submit(classify_intent, question)
                 
                 # Embed user query asynchronously to shorten response time
@@ -16,7 +22,7 @@ def build_chat_fn(retriever):
                 query_vector = query_vector_future.result()
     
         if is_rec_intent:
-            # If Yes to recomendation intent, proceed with the RAG pipeline for retrieval and recommendation
+            # If Yes, proceed with the RAG pipeline for retrieval and recommendation
             retrieved_movies = retriever.retrieve_and_rerank(query_vector, media_type.lower(), genres, providers, year_range)
             context = retriever.format_context(retrieved_movies)
             
@@ -25,11 +31,6 @@ def build_chat_fn(retriever):
             # If No, proceed with a general conversation
             user_message = question
 
-        # Check which LLM model to use
-        if model_provider.lower() == "anthropic":
-            for chunk in call_chat_model_anthropic(history, user_message):
-                yield chunk
-        else:
-            for chunk in call_chat_model_openai(history, user_message):
-                yield chunk
+        for chunk in call_chat_model_openai(history, user_message):
+            yield chunk
     return chat

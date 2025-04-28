@@ -9,14 +9,16 @@ class MovieRetriever:
         qdrant_client: QdrantClient,
         movie_collection_name: str,
         tv_collection_name: str,
-        popularity_weight: float = 0.4,  # Weight for popularity score boost during reranking
-        rating_weight: float = 0.6,  # Weight for rating score boost during reranking
+        semantic_weight: float = 0.4,  # Weight of semantic match score for reranking
+        popularity_weight: float = 0.2,  # Weight of popularity score for reranking
+        rating_weight: float = 0.4,  # Weight of rating score for reranking
         retrieval_limit: int = 300,  # Number of movies to retrieve for reranking
         top_k: int = 20,  # Number of post-reranking movies to send to LLM
     ):
         self.client = qdrant_client
         self.movie_collection_name = movie_collection_name
         self.tv_collection_name = tv_collection_name
+        self.semantic_weight = semantic_weight
         self.popularity_weight = popularity_weight
         self.rating_weight = rating_weight
         self.retrieval_limit = retrieval_limit
@@ -72,8 +74,8 @@ class MovieRetriever:
 
         scored_docs = [(
             point.payload,
-            point.score +
-            (self.popularity_weight * (float(point.payload.get("popularity", 0)) / max_popularity) +
+            (self.semantic_weight * point.score +
+            self.popularity_weight * (float(point.payload.get("popularity", 0)) / max_popularity) +
             self.rating_weight * (float(point.payload.get("vote_average", 0)) / 10))
         ) for point in points]
 
