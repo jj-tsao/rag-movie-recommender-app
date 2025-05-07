@@ -1,46 +1,53 @@
 # 🎬 RAG Movie & TV Recommender
 
-An AI-powered movie and TV show recommendation app using Retrieval-Augmented Generation (RAG), built with OpenAI Embedding/ Large Language Models (LLM), Qdrant vectorDB semantic search, The Movie Database (TMDB) API, and Gradio UI. Deployed on Hugging Face Spaces.
+An AI-powered recommendation system that delivers high-quality movie and TV show suggestions based on natural language queries, emotional tone, and metadata — using a fine-tuned BGE retriever, hybrid reranking, and Retrieval-Augmented Generation (RAG). Built with OpenAI, Hugging Face, Qdrant vectorDB, and Gradio UI. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
-👉 [Check it out on Hugging Face Spaces](https://huggingface.co/spaces/JJTsao/RAG_Movie_Recommendation_Assistant)
+👉 [Try the app on Hugging Face Spaces](https://huggingface.co/spaces/JJTsao/RAG_Movie_Recommendation_Assistant)
 
 ---
 
 ## 🔗 Related Project
 
-👉 Data Pipeline for Movie Fetching/Embedding: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
+👉 Training Pipeline & Dataset Generation: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
 
 ---
 ## 📌 Features
 
-- 🧠 **Retrieval Augmented Generation (RAG):** Combines real-time vector search and LLM for intelligent recommendations and responses
-- 🎯 **Hybrid Search & Reranking Pipeline:** Recommends movies based on natural language input combining semantic vector search and reranking by scalar metata (rating, popularity)
-- 🔎 **Interactive Filtering:** Refines movie recommendation with filters based on user input (genres, streaming services, release years)
+- 🧠 **RAG-based Recommendations** — Uses semantic retrieval + LLM reasoning to recommend titles based on story vibes, tone, and metadata.
+- 💡 **Fine-Tuned BGE Retriever** — Custom trained `bge-base-en-v1.5` retriever on metadata and vibe-based queries for improved relevance and speed.
+- 🎯 **Hybrid Search + Scalar Reranking** — Combines semantic similarity with reranking by movie/show rating and popularity.
+- 🎭 **Vibe-Aware Query Generation** — Model trained on emotional/mood-driven search phrases via LLMs to improve real-world matching behavior.
+- 🧪 **Hard Negative Sampling** — Uses genre, keyword, and cast/crew-based contrastive samples to boost model robustness.
+- 🔎 **Dynamic Filtering:** Refines recommendations with filters by genres, streaming services, and release years
 - ☁️ **Serverless Ready:** Retrieves up-to-date movie data from Qdrant Cloud vectorDB at runtime
-- 📊 **Dynamic Search UI:** Built with Gradio for fast and interactive querying
-
----
-
-## 🛠️ Tech Stack
-
-- **OpenAI** – Embedding and chat completion LLM provider
-- **Qdrant** – Cloud-based vector database for runtime retrieval
-- **TMDB API** – Movie data API provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
-- **Gradio** – Web app UI library
-- **Hugging Face Spaces** – Deployment platform
-- **Anthropic** - Intent classification and alternative chat LLM provider
+- 🖼️ **Interactive UI** — Gradio chatbot UI with dynamic dropdowns and smooth streaming of LLM responses.
 
 ---
 
 ## 🧠 How It Works
 
-1. User types a natural language query and apply optional filters (genres, streaming services, release years).
-2. App retrieves relevant movie or TV chunks from Qdrant, and reranks the results based on review rating and popularity.
-3. OpenAI generates a recommendation with natural language response based on retrieved content.
-4. App displays results through an interactive chatbot UI with Gradio.
-5. User contintues the conversation to refine the result or ask for new recommendations.
+1. **User Query**: You type a vibe-based prompt like _"Dark comedies with moral ambiguity and character-driven narrative"_.
+2. **Dynamic Filter**: You can apply additional filters for genres, streaming services, and release years to narrow down the result
+3. **Intent Detection**: A lightweight classifier determines if the prompt requests a recommendation.
+4. **Embedding + Retrieval**: Query is embedded using a fine-tuned BGE model; relevant chunks are retrieved from Qdrant.
+5. **Reranking**: Retrieved results are scored using a weighted mix of semantic similarity, rating, and popularity.
+6. **LLM Response**: LLM model generates a natural language final reply with insights, poster images, and reasoning.
+7. **Conversation**: Continue refining the request or pivoting tone using the interactive chatbot.
+
+---
+
+## 🛠️ Tech Stack
+
+- **SentenceTransformers** – Fine-tuned `bge-base-en-v1.5` retriever via _MultipleNegativesRankingLoss_ 
+- **Qdrant** – Cloud vector store with hybrid search and scalar boosting
+- **OpenAI** – Chat completions & training vibe query generation 
+- **Anthropic Claude** – Intent classification
+- **TMDB API** – Movie and TV data provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
+- **Hugging Face Hub** – Fine-tuned model hosting
+- **Hugging Face Spaces** – App hosting
+- **Gradio** – Streaming UI interface
 
 ---
 
@@ -67,7 +74,8 @@ OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 QDRANT_API_KEY=your_qdrant_key
 QDRANT_ENDPOINT=https://your-qdrant-endpoint_url
-QDRANT_COLLECTION_NAME=your_qdrant_collection_name
+QDRANT_MOVIE_COLLECTION_NAME=your_qdrant_movie_collection_name
+QDRANT_TV_COLLECTION_NAME=your_qdrant_tv_collection_name
 ```
 
 ### 4. Run the app locally
@@ -78,17 +86,17 @@ python app.py
 
 ---
 
-## 📂 Folder Structure
+## 📂 Project Structure
 
 ```
-├── app.py                  # Main startup point for the app
-├── ui.py                   # Frontend UI rendering with Gradio
-├── chatbot.py              # LLM chatbot and intent classification setup
-├── rag-pipeline.py         # Movie data retrieval and reranking pipeline
-├── llm_utils.py            # OpenAI/Anthropic LLM functions setup
-├── vectorestore.py         # Qdrant vector store setup
-├── config.py               # Configurations for environment variables
-└── requirements.txt        # Python dependencies
+├── app.py                  # Main endtry point for the app
+├── ui.py                   # Gradio UI with dynamic filters
+├── chatbot.py              # Chat handler with intent detection & streaming
+├── llm_services.py         # Embedding + chat model integration
+├── rag_pipeline.py         # Retrieval and reranking logic
+├── vectorstore.py          # Qdrant vector DB setup
+├── config.py               # Environment config
+└── requirements.txt        # Dependencies
 ```
 
 ## 📄 License
