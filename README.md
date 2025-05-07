@@ -10,7 +10,8 @@ An AI-powered recommendation system that delivers high-quality movie and TV show
 
 ## 🔗 Related Project
 
-👉 Training Pipeline & Dataset Generation: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
+💬 Embedding Pipeline: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
+🏋️ Training Data Pipeline: [[rag-movie-training-pipeline]](https://github.com/jj-tsao/rag-movie-training-pipeline)
 
 ---
 ## 📌 Features
