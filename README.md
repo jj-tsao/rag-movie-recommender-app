@@ -99,7 +99,41 @@ python app.py
 ├── config.py               # Environment config
 └── requirements.txt        # Dependencies
 ```
+---
 
+## 📈 Metrics
+
+| Metric     | Fine-Tuned `bge-base-en-v1.5` | Base `bge-base-en-v1.5` |
+| ---------- | :---------------------------: | :---------------------: |
+| Recall\@1  |           **0.456**           |          0.214          |
+| Recall\@3  |           **0.693**           |          0.361          |
+| Recall\@5  |           **0.758**           |          0.422          |
+| Recall\@10 |           **0.836**           |          0.500          |
+| MRR        |           **0.595**           |          0.315          |
+
+**Model Details**: [JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
+
+<br />
+  
+| Metric      | Fine-Tuned `all-minilm-l6-v2` | Base `all-minilm-l6-v2` |
+|-------------|:-----------------------------:|:-----------------------:|
+| Recall@1    |           **0.428**           |          0.149          |
+| Recall@3    |           **0.657**           |          0.258          |
+| Recall@5    |           **0.720**           |          0.309          |
+| Recall@10   |           **0.795**           |          0.382          |
+| MRR         |           **0.563**           |          0.230          |
+
+**Model Details**: [JJTsao/fine-tuned_movie_retriever-all-minilm-l6-v2](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-all-minilm-l6-v2)
+
+<br />
+
+**Evaluation setup**:
+- Dataset: 3,598 held-out metadata and vibe-style natural queries
+- Method: Top-k ranking using cosine similarity between query and positive documents
+- Goal: Assess top-k retrieval quality in recommendation-like settings
+
+
+---
 ## 📄 License
 
 [MIT License](LICENSE)
