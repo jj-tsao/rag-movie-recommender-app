@@ -72,6 +72,11 @@ class MovieRetriever:
         points = [point for point in hits.points]
         max_popularity = max((float(point.payload.get("popularity", 0)) for point in points), default=800)
 
+        print (f"\nRetrieved top 30:")
+        for i, point in enumerate(points[:30]):
+            print (f"#{i+1} Title: {point.payload.get('title', '')}, Popularity: {point.payload.get('popularity', '')}, Rating: {point.payload.get('vote_average', '')}, Retrieval Score: {point.score}")
+            i += 1
+
         scored_docs = [(
             point.payload,
             (self.semantic_weight * point.score +
@@ -81,6 +86,10 @@ class MovieRetriever:
 
         # Rerank by combined score and return results
         scored_docs.sort(key=lambda x: x[1], reverse=True)
+        print ("\nReranked top 20:")
+        for i, doc in enumerate(scored_docs[:20]):
+            print (f"#{i+1} Title: {doc[0].get('title', '')}, Popularity: {doc[0].get('popularity', '')}, Rating: {doc[0].get('vote_average', '')}, Rerankign Score: {doc[1]}")
+            i += 1
         return [payload for payload, _ in scored_docs]
     
     

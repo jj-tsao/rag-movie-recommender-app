@@ -74,7 +74,7 @@ def create_interface(chat_fn):
         
         with gr.Column():
             chatbot = gr.Chatbot(
-                placeholder="<div style='text-align: center;'><h3><strong>Your Personal Movie & TV Show Curator - Powered by AI</strong></h3>Tell me the vibe you're looking for 🍿<br>Like: Dark comedies with unexpected endings, moral ambiguity, and reflections on modern society</div>",
+                placeholder="<div style='text-align: center;'><h3><strong>Your Personal Movie & TV Show Curator - Powered by AI</strong></h3>Tell me the vibe you're looking for 🍿<br>Like: Psychological drama with character-driven narrative, moral ambiguity, and satire on contemporary society</div>",
                 type="messages",
                 bubble_full_width=False,
             )
