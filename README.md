@@ -18,7 +18,7 @@ An AI-powered recommendation system that delivers high-quality movie and TV show
 
 - 🧠 **RAG-based Recommendations** — Uses semantic retrieval + LLM reasoning to recommend titles based on story vibes, tone, and metadata.
 - 💡 **Fine-Tuned BGE Retriever** — Custom trained `bge-base-en-v1.5` retriever on metadata and vibe-based queries for improved relevance and speed.
-- 🎯 **Hybrid Search + Scalar Reranking** — Combines semantic similarity with reranking by movie/show rating and popularity.
+- 🎯 **Hybrid Search + Scalar Reranking** — Hybrid dense vector (semantic) search and sparse vector (BM25) search, combined with reranking by movie/show rating and popularity.
 - 🎭 **Vibe-Aware Query Generation** — Model trained on emotional/mood-driven search phrases via LLMs to improve real-world matching behavior.
 - 🧪 **Hard Negative Sampling** — Uses genre, keyword, and cast/crew-based contrastive samples to boost model robustness.
 - 🔎 **Dynamic Filtering:** Refines recommendations with filters by genres, streaming services, and release years
