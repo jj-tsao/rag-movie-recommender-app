@@ -1,6 +1,6 @@
 # 🎬 RAG Movie & TV Recommender
 
-An AI-powered recommendation system that delivers high-quality movie and TV show suggestions based on natural language queries, emotional tone, and metadata — using a fine-tuned BGE retriever, dense/sparse hybrid vector search, scalar reranking, and Retrieval-Augmented Generation (RAG). Built with Sentence Transformer model, Best Match 25 (BM25) algorithm, Qdrant VectorDB, OpenAI/Anthropic API, Hugging Face, and Gradio. Deployed on Hugging Face Spaces.
+An AI-powered recommendation system that delivers high-quality movie and TV show suggestions based on natural language queries, emotional tone, and metadata — using a fine-tuned BGE retriever model, dense/sparse hybrid vector search, scalar reranking, and Retrieval-Augmented Generation (RAG). Built with Sentence Transformers model, Best Match 25 (BM25) algorithm, Qdrant Vector DB, OpenAI/Anthropic API, Hugging Face, and Gradio. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
@@ -10,7 +10,7 @@ An AI-powered recommendation system that delivers high-quality movie and TV show
 
 ## 🔗 Related Projects
 
-- 💬 Embedding Pipeline: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
+- 💬 Data and Embedding Pipeline: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
 - 🏋️ Training Dataset Builder: [rag-movie-training-pipeline](https://github.com/jj-tsao/rag-movie-training-pipeline)
 - 🧠 Fine-Tuned Retriver Model (`bge-base-en-v1.5` based): [JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
 
@@ -18,11 +18,11 @@ An AI-powered recommendation system that delivers high-quality movie and TV show
 ## 📌 Features
 
 - 🧠 **RAG-based Recommendations** — Uses semantic retrieval + LLM reasoning to recommend titles based on story vibes, tone, and metadata.
-- 💡 **Fine-Tuned BGE Retriever** — Custom trained `bge-base-en-v1.5` retriever on metadata and vibe-based queries for improved relevance and speed.
-- 🎯 **Hybrid Search + Scalar Reranking** — Hybrid dense vector (semantic similarity) and sparse vector (BM25) search, combined with scalar reranking by movie/show rating and popularity.
+- 💡 **Fine-Tuned BGE Retriever Model** — Custom trained `bge-base-en-v1.5` retriever on metadata and vibe-based queries for improved relevance and speed.
+- 🎯 **Hybrid Search + Scalar Reranking** — Hybrid dense vector (Sentence Transformers) and sparse vector (BM25) similarity search, combined with scalar reranking by movie/show rating and popularity.
 - 🎭 **Vibe-Aware Query Generation** — Model trained on emotional/mood-driven search phrases via LLMs to improve real-world matching behavior.
 - 🧪 **Hard Negative Sampling** — Uses genre, keyword, and cast/crew-based contrastive samples to boost model robustness.
-- 🔎 **Dynamic Filtering:** Refines recommendations with filters by genres, streaming services, and release years
+- 🔎 **Dynamic Filtering:** Refines recommendations through interactive filters by genres, streaming services, and release years
 - ☁️ **Serverless Ready:** Retrieves up-to-date movie data from Qdrant Cloud vectorDB at runtime
 - 🖼️ **Interactive UI** — Gradio chatbot UI with dynamic dropdowns and smooth streaming of LLM responses.
 
@@ -33,7 +33,7 @@ An AI-powered recommendation system that delivers high-quality movie and TV show
 1. **User Query**: You type a vibe-based prompt like _"Dark comedies with moral ambiguity and character-driven narrative"_.
 2. **Dynamic Filter**: Apply additional filters for genres, streaming services, and release years to narrow down the result if prefer.
 3. **Intent Detection**: A lightweight classifier determines if the prompt requests a recommendation.
-4. **Embedding + Retrieval**: Query is embedded using a fine-tuned BGE model as well as BM25; relevant chunks are retrieved from Qdrant.
+4. **Embedding + Retrieval**: Query is embedded using a fine-tuned BGE model and BM25 algorithm; relevant chunks are retrieved from Qdrant.
 5. **Reranking**: Retrieved results are scored using a weighted mix of semantic similarity, rating, and popularity.
 6. **LLM Response**: LLM model generates a natural language final reply with insights, poster images, and reasoning.
 7. **Conversation**: Continue refining the request or pivoting tone using the interactive chatbot.
@@ -44,7 +44,7 @@ An AI-powered recommendation system that delivers high-quality movie and TV show
 
 - **SentenceTransformers** – Fine-tuned `bge-base-en-v1.5` retriever via _MultipleNegativesRankingLoss_
 - **Best Match 25 (BM25)** - Sparse vector generation model
-- **Qdrant** – Cloud vector store with hybrid search and scalar boosting
+- **Qdrant** – Cloud-based vector store with hybrid search and scalar boosting
 - **OpenAI** – Chat completions & training vibe query generation 
 - **Anthropic Claude** – Intent classification
 - **TMDB API** – Movie and TV data provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
