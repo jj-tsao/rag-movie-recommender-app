@@ -48,6 +48,7 @@ Built with Sentence Transformers (custom trained `bge-base-en-v1.5`), Best Match
 - **Qdrant** – Cloud-based vector store with hybrid search and scalar boosting
 - **OpenAI** – Chat completions & training vibe query generation 
 - **Anthropic Claude** – Intent classification
+- **Natural Language Toolkit (NLTK)** – Resources for stopword removal and lemmatization
 - **TMDB API** – Movie and TV data provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
 - **Hugging Face Hub** – Fine-tuned model hosting
 - **Hugging Face Spaces** – App hosting
