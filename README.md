@@ -1,6 +1,7 @@
 # 🎬 RAG Movie & TV Recommender
 
-An AI-powered recommendation system that delivers high-quality movie and TV show suggestions based on natural language queries, emotional tone, and metadata — using a fine-tuned BGE retriever model, dense/sparse hybrid vector search, scalar reranking, and Retrieval-Augmented Generation (RAG). Built with Sentence Transformers model, Best Match 25 (BM25) algorithm, Qdrant Vector DB, OpenAI/Anthropic API, Hugging Face, and Gradio. Deployed on Hugging Face Spaces.
+An AI-powered recommendation system that delivers high-quality movie and TV show suggestions based on natural language queries, emotional tone, and metadata — using a fine-tuned BGE retriever model, dense/sparse hybrid vector search, scalar reranking, and Retrieval-Augmented Generation (RAG). </br>
+Built with Sentence Transformers (custom trained `bge-base-en-v1.5`), Best Match 25 (BM25) algorithm, Qdrant Vector DB, OpenAI/Anthropic API, Hugging Face, and Gradio. Deployed on Hugging Face Spaces.
 
 ## 🌐 Live Demo
 
@@ -130,14 +131,19 @@ python app.py
 ## 📂 Project Structure
 
 ```
-├── app.py                  # Main endtry point for the app
-├── ui.py                   # Gradio UI with dynamic filters
-├── chatbot.py              # Chat handler with intent detection & streaming
-├── llm_services.py         # Embedding + chat model integration
-├── rag_pipeline.py         # Retrieval and reranking logic
-├── vectorstore.py          # Qdrant vector DB setup
-├── config.py               # Environment config
-└── requirements.txt        # Dependencies
+├── app.py                      # Main entry point for the app
+├── requirements.txt            # Dependencies
+├── README.md                   # Documentation for the app
+├── src/
+│   ├── ui.py                   # Gradio UI with interactive chatbot and dynamic filters
+│   ├── chatbot.py              # Chat handler with intent detection, RAG pipeline, and response streaming
+│   ├── llm_services.py         # LLM embedding + chat model integration
+│   ├── media_retriever.py      # Retrieval and reranking logic
+│   ├── vectorstore.py          # Qdrant vector DB setup
+│   └── config.py               # Environment config
+└── Data/
+    ├── bm25_files/             # Folder for BM25 model and vocabulary files
+    └── nltk_data/              # Folder for NLTK stopword and lemmatization resources
 ```
 ---
 
