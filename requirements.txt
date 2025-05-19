@@ -1,7 +1,0 @@
-sentence-transformers
-python-dotenv
-qdrant-client
-openai
-anthropic
-gradio
-gradio_rangeslider
