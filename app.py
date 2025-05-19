@@ -1,22 +1,15 @@
-from vectorstore import connect_qdrant
-from rag_pipeline import MovieRetriever
-from chatbot import build_chat_fn
-from ui import create_interface
-from llm_services import load_sentence_model
-from config import QDRANT_ENDPOINT, QDRANT_API_KEY, QDRANT_MOVIE_COLLECTION_NAME, QDRANT_TV_COLLECTION_NAME
+from src.chatbot import build_chat_fn
+from src.setup import setup_retriever
+from src.ui import create_interface
 
 
 def main():
-    # Eager load embedding model
-    model = load_sentence_model()
-
     # Persistent Qdrant connection and RAG retriever
-    qdrant_client = connect_qdrant(endpoint=QDRANT_ENDPOINT, api_key=QDRANT_API_KEY)
-    retriever = MovieRetriever(qdrant_client, QDRANT_MOVIE_COLLECTION_NAME, QDRANT_TV_COLLECTION_NAME)
-    
+    retriever = setup_retriever()
+
     # Build chat function with retriever injected
     chat_fn = build_chat_fn(retriever)
-    
+
     # Create and launch UI
     demo = create_interface(chat_fn)
     demo.launch(inbrowser=True, debug=True, share=False)
