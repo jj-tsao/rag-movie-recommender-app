@@ -11,14 +11,17 @@ Built with Sentence Transformers (custom trained `bge-base-en-v1.5`), Best Match
 
 ## 🔗 Related Projects
 
-- 💬 Data and Embedding Pipeline: [GitHub: jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
-- 🏋️ Training Dataset Builder: [rag-movie-training-pipeline](https://github.com/jj-tsao/rag-movie-training-pipeline)
+- 💬 Data and Embedding Pipeline: [jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
+- 🏋️ Training Dataset Builder: [jj-tsao/rag-movie-training-pipeline](https://github.com/jj-tsao/rag-movie-training-pipeline)
 - 🧠 Fine-Tuned Retriver Model (`bge-base-en-v1.5` based): [JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
+- 🤖 Intent Classifier Model: [JJTsao/intent-classifier-distilbert-moviebot](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot)
+
 
 ---
 ## 📌 Features
 
 - 🧠 **RAG-based Recommendations** — Uses semantic retrieval + LLM reasoning to recommend titles based on story vibes, tone, and metadata.
+- 🤖 **Fine-Tuned Intent Classifier** — A fine-tuned DistilBERT model trained to detect recommendation vs. generic intent with low-latency.
 - 💡 **Fine-Tuned BGE Retriever Model** — Custom trained `bge-base-en-v1.5` retriever on metadata and vibe-based queries for improved relevance and speed.
 - 🎯 **Hybrid Search + Scalar Reranking** — Hybrid dense vector (Sentence Transformers) and sparse vector (BM25) similarity search, combined with scalar reranking by movie/show rating and popularity.
 - 🎭 **Vibe-Aware Query Generation** — Model trained on emotional/mood-driven search phrases via LLMs to improve real-world matching behavior.
@@ -33,7 +36,7 @@ Built with Sentence Transformers (custom trained `bge-base-en-v1.5`), Best Match
 
 1. **User Query**: You type a vibe-based prompt like _"Dark comedies with moral ambiguity and character-driven narrative"_.
 2. **Dynamic Filter**: Apply additional filters for genres, streaming services, and release years to narrow down the result if prefer.
-3. **Intent Detection**: A lightweight classifier determines if the prompt requests a recommendation.
+3. **Intent Detection**: A custom trained DistilBERT model determines if the prompt requests a recommendation.
 4. **Embedding + Retrieval**: Query is embedded using a fine-tuned BGE model and BM25 algorithm; relevant chunks are retrieved from Qdrant.
 5. **Reranking**: Retrieved results are scored using a weighted mix of semantic similarity, rating, and popularity.
 6. **LLM Response**: LLM model generates a natural language final reply with insights, poster images, and reasoning.
@@ -44,12 +47,12 @@ Built with Sentence Transformers (custom trained `bge-base-en-v1.5`), Best Match
 ## 🛠️ Tech Stack
 
 - **SentenceTransformers** – Fine-tuned `bge-base-en-v1.5` retriever via _MultipleNegativesRankingLoss_
+- **DistilBERT (Fine-Tuned)** – Lightweight intent detection model for fast classification (3-class: recommendation, factual, generic) 
 - **Best Match 25 (BM25)** - Sparse vector generation model
 - **Qdrant** – Cloud-based vector store with hybrid search and scalar boosting
-- **OpenAI** – Chat completions & training vibe query generation 
-- **Anthropic Claude** – Intent classification
+- **Hugging Face Transformers** – For pipeline loading and on-device inference of classification model
 - **Natural Language Toolkit (NLTK)** – Resources for stopword removal and lemmatization
-- **TMDB API** – Movie and TV data provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
+- **The Move Database (TMDB) API** – Movie and TV data provider (see [Data pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline))
 - **Hugging Face Hub** – Fine-tuned model hosting
 - **Hugging Face Spaces** – App hosting
 - **Gradio** – Streaming UI interface
