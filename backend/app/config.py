@@ -12,8 +12,8 @@ QDRANT_ENDPOINT = os.getenv("QDRANT_ENDPOINT")
 QDRANT_MOVIE_COLLECTION_NAME = os.getenv("QDRANT_MOVIE_COLLECTION_NAME_BGE")
 QDRANT_TV_COLLECTION_NAME = os.getenv("QDRANT_TV_COLLECTION_NAME_BGE")
 
-NLTK_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "nltk_data"
-BM25_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "bm25_files"
+NLTK_PATH = Path(__file__).resolve().parent.parent / "data" / "nltk_data"
+BM25_PATH = Path(__file__).resolve().parent.parent / "data" / "bm25_files"
 
 INTENT_MODEL = "JJTsao/intent-classifier-distilbert-moviebot"   # Fine-tuned intent classification model for query intent classifiation  
 EMBEDDING_MODEL = "JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5"  # Fine-tuned sentence transfomer model for query dense vector embedding 
