@@ -1,25 +1,26 @@
 # Web framework
-fastapi==0.110.1
-uvicorn[standard]==0.29.0
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
 
 # HTTP client
-httpx==0.27.0
+httpx==0.28.1
+openai==1.82.0
 
 # Transformers & Hugging Face tools
-transformers==4.40.1
-sentence-transformers==2.6.1
+transformers==4.52.3
+sentence-transformers==4.1.0
 
 # Vector DB
-qdrant-client==1.8.2
+qdrant-client==1.14.2
 
 # Caching, file IO, progress
-tqdm==4.66.4
-joblib==1.4.2
-python-dotenv==1.0.1
+tqdm==4.67.1
+joblib==1.5.0
+python-dotenv==1.1.0
 
 # NLTK for BM25 and query preprocessing
-nltk==3.8.1
+nltk==3.9.1
 rank-bm25==0.2.2
 
 # Typing for Python 3.10+
-typing_extensions>=4.0.0
+typing_extensions>=4.13.2
