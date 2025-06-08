@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: jt-rag-movie-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_ENDPOINT
+        sync: false
+      - key: QDRANT_MOVIE_COLLECTION_NAME_BGE
+        value: movie_recs_bge
+      - key: QDRANT_TV_COLLECTION_NAME_BGE
+        value: tv_recs_bge
