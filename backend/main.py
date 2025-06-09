@@ -1,7 +1,5 @@
-import sys
-sys.path.append("backend") 
-
 from app.api_routes import router
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
