@@ -1,5 +1,6 @@
 from collections import Counter
-from typing import Dict, List
+from typing import Dict, List, Tuple
+import threading
 
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
@@ -7,6 +8,8 @@ from nltk.tokenize import word_tokenize
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue, Range, models
 from sentence_transformers import SentenceTransformer
+
+_stop_words_lock = threading.Lock()
 
 
 class MediaRetriever:
@@ -45,7 +48,12 @@ class MediaRetriever:
 
     @staticmethod
     def tokenize_and_preprocess(text: str) -> List[str]:
-        stop_words = set(stopwords.words("english"))
+        with _stop_words_lock:
+            try:
+                stop_words = set(stopwords.words("english"))
+            except Exception as e:
+                print("⚠️ Failed to load NLTK stopwords:", e)
+                stop_words = set()        
         stemmer = PorterStemmer()
 
         tokens = word_tokenize(text.lower())
@@ -57,12 +65,12 @@ class MediaRetriever:
     def embed_sparse(self, query: str, media_type: str) -> Dict:
         bm25_model = (
             self.bm25_models["movie"]
-            if media_type.lower() == "movies"
+            if media_type.lower() == "movie"
             else self.bm25_models["tv"]
         )
         bm25_vocab = (
             self.bm25_vocabs["movie"]
-            if media_type.lower() == "movies"
+            if media_type.lower() == "movie"
             else self.bm25_vocabs["tv"]
         )
 
@@ -91,7 +99,7 @@ class MediaRetriever:
         self,
         dense_vector: List[float],
         sparse_vector: Dict,
-        media_type: str = "movies",
+        media_type: str = "movie",
         genres=None,
         providers=None,
         year_range=None,
@@ -118,7 +126,7 @@ class MediaRetriever:
 
         # Fuse dense and sparse results and rerank
         fused = self.fuse_dense_sparse(dense_results, sparse_results)
-        reranked = self.rerank_fused_results(fused)
+        reranked, scored_lookup = self.rerank_fused_results(fused)
 
         reranked_ids = [p.id for p in reranked[:20]]
         print ("\nReranked Top-30:")
@@ -129,7 +137,7 @@ class MediaRetriever:
                 f"#{i + 1} {p.payload.get('title', '')} | Score: {p.score} Dense: {f['dense_score']:.3f}, Sparse: {f['sparse_score']:.3f}, Pop: {p.payload.get('popularity', 0)}, Rating: {p.payload.get('vote_average', 0)}"
             )
 
-        return reranked[: self.top_k]
+        return reranked[: self.top_k], scored_lookup
 
     def _build_filter(
         self, genres=None, providers=None, year_range=None
@@ -163,7 +171,7 @@ class MediaRetriever:
     def _query_dense(self, vector, media_type, qdrant_filter):
         collection = (
             self.movie_collection_name
-            if media_type == "movies"
+            if media_type == "movie"
             else self.tv_collection_name
         )
         return self.client.query_points(
@@ -172,14 +180,14 @@ class MediaRetriever:
             using="dense_vector",
             query_filter=qdrant_filter,
             limit=self.semantic_retrieval_limit,
-            with_payload=["llm_context", "title", "popularity", "vote_average"],
+            with_payload=["llm_context", "media_id", "title", "popularity", "vote_average"],
             with_vectors=False,
         )
 
     def _query_sparse(self, vector, media_type, qdrant_filter):
         collection = (
             self.movie_collection_name
-            if media_type == "movies"
+            if media_type == "movie"
             else self.tv_collection_name
         )
         return self.client.query_points(
@@ -188,7 +196,7 @@ class MediaRetriever:
             using="sparse_vector",
             query_filter=qdrant_filter,
             limit=self.bm25_retrieval_limit,
-            with_payload=["llm_context", "title", "popularity", "vote_average"],
+            with_payload=["llm_context", "media_id", "title", "popularity", "vote_average"],
             with_vectors=False,
         )
 
@@ -227,29 +235,38 @@ class MediaRetriever:
     def rerank_fused_results(
         self,
         fused: Dict[str, Dict],
-    ) -> List:
+    ) -> Tuple[List, Dict]:
         max_popularity = max(
             (float(f["point"].payload.get("popularity", 0)) for f in fused.values()),
             default=1.0,
         )
 
-        def compute_score(f):
+        scored = {}
+        for id_, f in fused.items():
             point = f["point"]
             dense_score = f["dense_score"]
             sparse_score = f["sparse_score"]
             popularity = float(point.payload.get("popularity", 0)) / max_popularity
             vote_average = float(point.payload.get("vote_average", 0)) / 10.0
 
-            return (
+            reranked_score = (
                 self.dense_weight * dense_score
                 + self.sparse_weight * sparse_score
                 + self.rating_weight * vote_average
                 + self.popularity_weight * popularity
             )
 
-        reranked = sorted(fused.values(), key=compute_score, reverse=True)
+            scored[id_] = {
+                "point": point,
+                "dense_score": dense_score,
+                "sparse_score": sparse_score,
+                "reranked_score": reranked_score,
+            }
 
-        return [f["point"] for f in reranked]
+        sorted_ids = sorted(scored.items(), key=lambda x: x[1]["reranked_score"], reverse=True)
+
+        return [v["point"] for _, v in sorted_ids], scored
+
 
     def format_context(self, movies: list[dict]) -> str:
         # Formart the retrieved documents as context for LLM

@@ -1,4 +1,4 @@
-from app.media_retriever import MediaRetriever
+from app.retrieval.media_retriever import MediaRetriever
 
 def get_media_retriever(
     embed_model,

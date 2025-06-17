@@ -1,4 +1,4 @@
-from app.api_routes import router
+from app.api.api_routes import router
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,4 +19,8 @@ app.include_router(router)
 
 @app.get("/health")
 def health_check():
+    return {"status": "ok"}
+
+@app.get("/")
+def read_root():
     return {"status": "ok"}
