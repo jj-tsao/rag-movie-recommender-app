@@ -6,7 +6,17 @@ At its core, Reelix combines hybrid vector search (dense/semantic + BM25 sparse)
 
 From vibe-aware querying and streaming output to reranking by narrative relevance, Reelix blends AI retrieval, ranking, and generation into a seamless cinematic discovery experience.
 
+## 🌐 Live Product 
 
+- 👉 [Reelix AI](https://reelixai.netlify.app/)
+
+---
+## 🔗 Related Projects
+
+- 💬 Data and Embedding Pipeline: [jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
+- 🏋️ Training Dataset Builder: [jj-tsao/rag-movie-training-pipeline](https://github.com/jj-tsao/rag-movie-training-pipeline)
+- 🧠 Fine-Tuned Retriver Model (`bge-base-en-v1.5` based): [JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
+- 🤖 Fine-Tuned Intent Classifier Model (`distilbert-base-uncased` based): [JJTsao/intent-classifier-distilbert-moviebot](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot)
 ---
 
 ## 🧠 Features
