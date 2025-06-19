@@ -2,7 +2,7 @@
 
 Reelix is an AI-native movie and TV recommendation platform that curates personalized suggestions based on mood, theme, and storytelling preferences in natural language. Built with a modern full-stack architecture (FastAPI, React/Vite, Tailwind CSS, Supabase), Reelix utilizes advanced retrieval-augmented generation (RAG) pipeline and LLM reasoning to deliver rich, emotionally attuned viewing recommendations.
 
-At its core, Reelix combines hybrid vector search (dense/semantic + BM25 sparse) using a fine-tuned SentenceTransformer model with real-time intent classification (DistilBERT) and LLM-based reasoning. The system embeds user queries into semantic and keyword-based representations, retrieves contextually relevant candidates from a vector database (Qdrant), and dynamically crafts markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend.
+At its core, Reelix combines hybrid vector search (dense/semantic + sparse/BM25) using a fine-tuned SentenceTransformer model with real-time intent classification (DistilBERT) and LLM reasoning. The system embeds user queries into semantic and keyword-based representations, retrieves contextually relevant candidates from a vector database (Qdrant), and dynamically crafts markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend.
 
 From vibe-aware querying and streaming output to reranking by narrative relevance, Reelix blends AI retrieval, ranking, and generation into a seamless cinematic discovery experience.
 
@@ -35,7 +35,7 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 - **React Frontend (Vite + Tailwind CSS)**:
   - Real-time streaming UI with styled movie/ tv show recommendation cards
   - Advanced filters: streaming providers, genres, release year
-  - Rich, personalized recommendations with rating, poster, trailer, and reasoning (why you might enjoy it)
+  - Rich, personalized recommendations with rating, poster, trailer, and rationale (why you might enjoy it)
 
 - **LLM Integration**:
   - Intent classification: detect recommendation vs. general chat using custom-trained DistilBERT model
@@ -77,7 +77,7 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 5. Qdrant retrieves top-300 matches via dense and sparse vector search
 6. Retrieved medias are re-ranked based on semantic, keywords, rating, and popularity
 7. Top-20 reranked results are sent to LLM for final recommendation and summary
-7. UI streams response card-by-card with poster, rating, metadata, reasoning, and trailer link
+7. UI streams response card-by-card with poster, rating, metadata, rationale, and trailer link
 9. Final selections are logged to Supabase
 
 ---
