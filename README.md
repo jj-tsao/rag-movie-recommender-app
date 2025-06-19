@@ -1,6 +1,6 @@
 # 🎬 Reelix AI – Personalized Movie & TV Show Recommendations
 
-Reelix is an AI-native movie and TV recommendation platform that curates personalized suggestions based on mood, theme, and storytelling preferences in natural language. Built with a modern full-stack architecture (FastAPI, React/Vite, Tailwind CSS, Supabase), Reelix utilizes advanced retrieval-augmented generation (RAG) pipeline and LLM reasoning to deliver rich, emotionally attuned viewing recommendations.
+Reelix is an AI-native movie and TV recommendation platform that curates personalized suggestions based on mood, theme, and storytelling preferences in natural language. Built with a modern full-stack architecture (FastAPI, React/Vite, Tailwind CSS, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and large language models to deliver rich, emotionally attuned viewing recommendations.
 
 At its core, Reelix combines hybrid vector search (dense/semantic + sparse/BM25) using a fine-tuned SentenceTransformer model with real-time intent classification (DistilBERT) and LLM reasoning. The system embeds user queries into semantic and keyword-based representations, retrieves contextually relevant candidates from a vector database (Qdrant), and dynamically crafts markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend.
 
