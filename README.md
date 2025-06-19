@@ -18,7 +18,7 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 
 ## 🌐 Live Product 
 
-- 👉 Try it here: [**Reelix AI**](https://reelixai.netlify.app/)
+👉 Try it here: [**Reelix AI**](https://reelixai.netlify.app/)
 
 ## Preview
 
@@ -30,10 +30,10 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 ---
 ## 🔗 Related Projects
 
-- 💬 Data and Embedding Pipeline: [jj-tsao/rag-movie-embedding-pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
-- 🏋️ Training Dataset Builder: [jj-tsao/rag-movie-training-pipeline](https://github.com/jj-tsao/rag-movie-training-pipeline)
-- 🧠 Fine-Tuned Retriver Model (`bge-base-en-v1.5` based): [JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
-- 🤖 Fine-Tuned Intent Classifier Model (`distilbert-base-uncased` based): [JJTsao/intent-classifier-distilbert-moviebot](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot)
+- 💬 [Data and Embedding Pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)  
+- 🏋️ [Training Dataset Builder](https://github.com/jj-tsao/rag-movie-training-pipeline)
+- 🧠 [Fine-Tuned Retriver Model](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5) (`bge-base-en-v1.5` based)
+- 🤖 [Fine-Tuned Intent Classifier Model](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot) (`distilbert-base-uncased` based)
 ---
 
 ## 🧠 Features
