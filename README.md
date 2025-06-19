@@ -1,5 +1,15 @@
 # 🎬 Reelix AI – Personalized Movie & TV Show Recommendations
 
+[![Netlify](https://img.shields.io/netlify/e21595f0-7eca-4fde-8136-5593fb2b5392?logo=netlify&label=Live%20Site)](https://reelixai.netlify.app/)
+[![Retriever Model](https://img.shields.io/badge/HuggingFace-Retriever%20Model-blue?logo=huggingface)](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
+[![Intent Classifier](https://img.shields.io/badge/HuggingFace-Intent%20Classifier-blue?logo=huggingface)](https://huggingface.co/JJTsao/intent_classifier-distilbert)
+[![Made with FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi)](https://jjtsao-rag-movie-api.hf.space/docs#/)
+[![Built with React](https://img.shields.io/badge/Frontend-React-61dafb?logo=react)](https://reelixai.netlify.app/)
+![License](https://img.shields.io/github/license/jj-tsao/rag-movie-recommender-app)
+
+
+
+
 Reelix is an AI-native movie and TV recommendation platform that curates personalized suggestions based on mood, theme, and storytelling preferences in natural language. Built with a modern full-stack architecture (FastAPI, React/Vite, Tailwind CSS, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and large language models to deliver rich, emotionally attuned viewing recommendations.
 
 At its core, Reelix combines hybrid vector search (dense/semantic + sparse/BM25) using a fine-tuned SentenceTransformer model with real-time intent classification (DistilBERT) and LLM reasoning. The system embeds user queries into semantic and keyword-based representations, retrieves contextually relevant candidates from a vector database (Qdrant), and dynamically crafts markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend.
@@ -8,7 +18,14 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 
 ## 🌐 Live Product 
 
-- 👉 [Reelix AI](https://reelixai.netlify.app/)
+- 👉 Try it here: [**Reelix AI**](https://reelixai.netlify.app/)
+
+## Preview
+
+> 🎬 Reelix understands your vibe and curates markdown-rich suggestions, trailers, and rationale in real time.
+
+<img src="https://github.com/user-attachments/assets/ef03a55a-b9b5-4136-8654-5d7fa3f4e97d" alt="Reelix Preview" width="100%" />
+
 
 ---
 ## 🔗 Related Projects
@@ -39,7 +56,7 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 
 - **LLM Integration**:
   - Intent classification: detect recommendation vs. general chat using custom-trained DistilBERT model
-  - Retrieval model trained on emotional/mood-driven queries mimicking real-world search behavior
+  - Retrieval model trained on a dataset of vibe-based natural language queries to emulate real-world discovery patterns
   - Contextual, vibe-aware recommendation streaming based on retrieved results
 
 - **Logging (Supabase)**:
@@ -77,7 +94,7 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 5. Qdrant retrieves top-300 matches via dense and sparse vector search
 6. Retrieved medias are re-ranked based on semantic, keywords, rating, and popularity
 7. Top-20 reranked results are sent to LLM for final recommendation and summary
-7. UI streams response card-by-card with poster, rating, metadata, rationale, and trailer link
+8. UI streams response card-by-card with poster, rating, metadata, rationale, and trailer link
 9. Final selections are logged to Supabase
 
 ---
