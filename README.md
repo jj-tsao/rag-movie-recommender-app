@@ -30,12 +30,12 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 ---
 ## 🔗 Related Projects
 
-- 💬 [Data and Embedding Pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
 - 🏋️ [Reranker Training](https://github.com/jj-tsao/rag-movie-reranker-training-pipeline/tree/main)
 - 📊 [Trained Cross-Encoder Reranker](https://huggingface.co/JJTsao/movietv-reranker-cross-encoder-base-v1) (`bert-base-uncased` backbone)
 - 🏋️ [Retriever Training](https://github.com/jj-tsao/rag-movie-training-pipeline)
 - 🧠 [Fine-Tuned Retriver Model](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5) (`bge-base-en-v1.5` based)
 - 🤖 [Fine-Tuned Intent Classifier Model](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot) (`distilbert-base-uncased` based)
+- 💬 [Data and Embedding Pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
 ---
 
 ## 🧠 Features
