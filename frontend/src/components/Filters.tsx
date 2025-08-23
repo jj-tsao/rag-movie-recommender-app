@@ -65,8 +65,9 @@ export default function Filters({ filters, setFilters }: Props) {
     "fuboTV",
     "Starz",
     "AMC+",
-    "Sling TV",
+    "Tubi TV",
     "Philo",
+    "Sling TV",
   ];
 
   return (
