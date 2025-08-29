@@ -94,7 +94,7 @@ export default function Filters({ filters, setFilters }: Props) {
 
       <div className="w-full px-1">
         <YearRangeSlider
-          min={1920}
+          min={1970}
           max={2025}
           values={filters.year_range}
           onChange={(range: [number, number]) =>

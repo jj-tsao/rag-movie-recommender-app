@@ -40,7 +40,7 @@ export default function Home() {
     media_type: "movie",
     genres: [],
     providers: [],
-    year_range: [1920, 2025],
+    year_range: [1970, 2025],
   });
 
   const [question, setQuestion] = useState("");
@@ -76,7 +76,7 @@ export default function Home() {
         media_type: "movie",
         genres: [],
         providers: [],
-        year_range: [1920, 2025],
+        year_range: [1970, 2025],
       });
     }
   }, [location.pathname]);
@@ -118,7 +118,7 @@ export default function Home() {
     !showFilters &&
     (filters.genres.length > 0 ||
       filters.providers.length > 0 ||
-      filters.year_range[0] !== 1920 ||
+      filters.year_range[0] !== 1970 ||
       filters.year_range[1] !== 2025);
 
   return (
@@ -231,14 +231,14 @@ export default function Home() {
               />
             ))}
 
-            {(filters.year_range[0] !== 1920 ||
+            {(filters.year_range[0] !== 1970 ||
               filters.year_range[1] !== 2025) && (
               <ActiveFilterPill
                 label={`Year: ${filters.year_range[0]}–${filters.year_range[1]}`}
                 onClear={() =>
                   setFilters((prev) => ({
                     ...prev,
-                    year_range: [1920, 2025],
+                    year_range: [1970, 2025],
                   }))
                 }
               />
@@ -251,7 +251,7 @@ export default function Home() {
                   ...prev,
                   genres: [],
                   providers: [],
-                  year_range: [1920, 2025],
+                  year_range: [1970, 2025],
                 }))
               }
             >
