@@ -25,7 +25,7 @@ class ChatRequest(BaseModel):
     media_type: MediaType = MediaType.MOVIE
     genres: List[str] = []
     providers: List[str] = []
-    year_range: List[int] = [1920, 2025]
+    year_range: List[int] = [1970, 2025]
     session_id: str
     query_id: str
     device_info: Optional[DeviceInfo] = None
