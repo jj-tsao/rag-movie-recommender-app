@@ -28,7 +28,6 @@ if not OPENAI_API_KEY or not QDRANT_API_KEY or not SUPABASE_API_KEY:
     raise ValueError("Missing API key(s).")
 if (
     not QDRANT_ENDPOINT
-    or not QDRANT_MOVIE_COLLECTION_NAME
-    or not QDRANT_TV_COLLECTION_NAME
+    or not SUPABASE_URL
 ):
-    raise ValueError("Missing QDrant URL or collection name.")
+    raise ValueError("Missing QDrant or Supabase URL.")
