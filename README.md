@@ -8,11 +8,9 @@
 ![License](https://img.shields.io/github/license/jj-tsao/rag-movie-recommender-app)
 
 
+[Reelix](https://reelixai.netlify.app/) is an AI‑native discovery agent that turns a vibe‑style natural language query into cinematic recommendations. It leverages hybrid search (dense/semantic + sparse/BM25) with fine-tuned SentenceTransformer retriever (BGE), cross‑encoder reranker (BERT), real-time intent classification (DistilBERT), and LLM reasoning to dynamically craft markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend. 
 
-
-[Reelix](https://reelixai.netlify.app/) is an AI-native movie and TV recommendation platform that curates personalized suggestions based on mood, theme, and storytelling preferences in natural language. Built with a modern full-stack architecture (FastAPI, React/Vite, Tailwind CSS, Qdrant Vector DB, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and large language models to deliver rich, emotionally attuned viewing recommendations.
-
-At its core, Reelix combines hybrid vector search (dense/semantic + sparse/BM25) using a fine-tuned SentenceTransformer model with real-time intent classification (DistilBERT) and LLM reasoning. The system embeds user queries into semantic and keyword-based representations, retrieves contextually relevant candidates from a vector database (Qdrant), and dynamically crafts markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend.
+Built with a modern full-stack architecture (FastAPI, React/Vite, Qdrant Vector DB, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and large language models to deliver rich, emotionally attuned viewing recommendations.
 
 From vibe-aware querying and streaming output to reranking by narrative relevance, Reelix blends AI retrieval, ranking, and generation into a seamless cinematic discovery experience.
 
@@ -20,9 +18,26 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 
 👉 Try it here: [**Reelix AI**](https://reelixai.netlify.app/)
 
+---
+
+## ✨ What’s New (Pipeline v2)
+
+Reelix now runs a 4‑stage recommendation pipeline with a fine‑tuned Cross‑Encoder (CE) reranker:
+
+1. Base Fusion (RRF) – Build a candidate pool by fusing top‑K results from dense semantic search and sparse BM25 (reciprocal‑rank fusion, k=60).
+
+2. Metadata Rerank – Score candidates with a weighted model: dense 0.60 + sparse 0.15 + rating 0.15 + popularity 0.10. Ratings use a Bayesian prior and popularity is log‑scaled with media‑type anchors (movie vs TV) for robust normalization across tails.
+
+3. Cross‑Encoder Rerank (CE) – Re‑score the dense top‑30 with a fine‑tuned BERT‑based CE on (query, doc) pairs, then produce a CE order.
+
+4. Final Fusion (RRF) – Fuse (top metadata IDs) vs (top CE IDs) to get a stable final list that benefits from both content signals and learned pairwise relevance.
+
+- CE fallback: if the CE model is unavailable, the system gracefully returns the metadata‑reranked list.
+
+---
 ## Preview
 
-> 🎬 Reelix understands your vibe and curates markdown-rich suggestions, trailers, and rationale in real time.
+> Reelix understands your vibe and curates markdown-rich suggestions, trailers, and rationale in real time.
 
 <img src="https://github.com/user-attachments/assets/ef03a55a-b9b5-4136-8654-5d7fa3f4e97d" alt="Reelix Preview" width="100%" />
 
@@ -38,36 +53,86 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 - 💬 [Data and Embedding Pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
 ---
 
-## 🧠 Features
+## ✨ Features
 
 - **Hybrid Retrieval + Reranking**:
-  - Dense semantic search via fine-tuned SentenceTransformer (`bge-base-en-v1.5`-based)
-  - Sparse keyword search leveraging BM25 (Best Match 25) algorithm
-  - Reranked by a weighted score of: semantic, sparse, rating, and popularity
-  - Real-time retrieval pipeline from cloud-based vector database (Qdrant)
+  - Dense semantic retrieval via fine‑tuned bge-base-en-v1.5
+  - Sparse keyword retrieval via BM25 (trained over curated "embedding_text")
+  - Metadata rerank with Bayesian quality + log popularity anchors
+  - Fine‑tuned Cross‑Encoder reranker (BERT backbone) for pairwise relevance
+  - Double‑RRF fusions for robustness (pre‑pool + final fusion)
 
 - **FastAPI Backend**:
-  - `/chat` endpoint with streaming response (`StreamingResponse`)
-  - `/log/final_recs` endpoint for usage data logging (Supabase)
-  - Embedded model warm-up and retriever setup on startup
+  - `/chat` streams markdown with structured tokens for the UI
+  - `/log/final_recs` stores final selections & why‑summaries to Supabase
+  - On‑startup warmups for embedder, intent classifier, BM25, and CE
 
 - **React Frontend (Vite + Tailwind CSS)**:
-  - Real-time streaming UI with styled movie/ tv show recommendation cards
-  - Advanced filters: streaming providers, genres, release year
+  - Real‑time card streaming; trailer, ratings, genres, why‑you’ll‑like‑it
+  - Advanced filters (providers/genres/year) with accessible UI controls
   - Rich, personalized recommendations with rating, poster, trailer, and rationale (why you might enjoy it)
 
 - **LLM Integration**:
-  - Intent classification: detect recommendation vs. general chat using custom-trained DistilBERT model
+  - Intent classifier (DistilBERT) to route **recommendation vs chat**
   - Retrieval model trained on a dataset of vibe-based natural language queries to emulate real-world discovery patterns
   - Contextual, vibe-aware recommendation streaming based on retrieved results
 
 - **Logging (Supabase)**:
-  - Query logging with session, device, and intent metadata
-  - Result logs: dense/sparse/reranking score breakdown per media item
-  - Final selection and reasoning logging
+  - Query/result logs with **dense/sparse/metadata/CE/final** traces
+  - Session, device, and filter metadata for analysis
+
+---
+## 🏗️ Pipeline Architecture (High‑Level)
+
+```
+User prompt ──▶ Intent Classifier ──┐
+                                    │ yes
+                                    ▼
+                            Query Encoder (dense + sparse)
+                                    │
+                 ┌──────────────────┴──────────────┐
+                 ▼                                 ▼
+           Dense Search                        Sparse Search
+                 │                                 │
+                 └─────── RRF (pool build) ────────┘
+                                    │
+                             Metadata Rerank
+                                    │ (top 100)
+                                    ├─▶ take top 30 for CE
+                                    │
+                          Cross‑Encoder Rerank (top‑30)
+                                    │
+                    Final RRF: (meta‑top) ⊕ (CE‑top)
+                                    │
+                              Top‑K to LLM
+                                    ▼
+                              UI Streaming
+```
+
+
+**Tunable knobs** (with sensible defaults):
+
+- Retrieval depths: `dense_depth=300`, `sparse_depth=20`
+- Fusion: `rrf_k=60`
+- Metadata weights: `{dense: 0.60, sparse: 0.15, rating: 0.15, popularity: 0.10}`
+- CE window: `meta_ce_top_n=30`
+- Final size: `final_top_k=20`
 
 ---
 
+## 🔬 Tracing & Logging
+
+Each final candidate carries a **ScoreTrace** with:
+
+- `dense_rank`, `sparse_rank` – rank positions from initial searches
+- `meta_score` – metadata weighted score after normalization
+- `ce_score` – raw CE logit (per‑query normalized optionally)
+- `final_rrf` – score from the **final fusion** (used as `reranked_score` in logs)
+
+Supabase tables capture query metadata, per‑rank scores, and final recs (with why‑summaries) for evaluation.
+
+
+---
 ## 🚀 Tech Stack
 
 | Layer        | Tech                     |
@@ -76,6 +141,7 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
 | Backend                | FastAPI (Python 3.13) + Docker                       |
 | Intent Classification  | DistilBERT (fine-tuned `distilbert-base-uncased`)    |
 | Embedding/ Retrieval   | SentenceTransformers (fine-tuned `bge-base-en-v1.5`) |
+| Reranking | **Cross‑Encoder (BERT)** + Metadata scoring + **RRF** |
 | Sparse Search          | BM25 (Best Match 25) via `rank_bm25`                 |
 | Tokenization           | NLTK (Natural Language Toolkit)                      |
 | Vector DB              | Qdrant (hybrid search)                               |
@@ -155,10 +221,17 @@ From vibe-aware querying and streaming output to reranking by narrative relevanc
  |   ├── llm/
  |   |   ├── 📄 custom_models.py   # Loads SentenceTransformer, DistilBERT, and BM25 models
  |   |   └── 📄 llm_completion.py  # Handles OpenAI GPT streaming completions
+ │   ├── rec_pipeline/
+ │   │   └── recommend.py          # 4‑stage pipeline (RRF → metadata → CE → RRF)
+ │   ├── ranking/
+ │   │   ├── metadata.py           # Bayesian rating; log‑pop anchors; weights
+ │   │   ├── cross_encoder_reranker.py  # CE wrapper (batching, fp16 CUDA)
+ │   │   └── rrf.py                # Reciprocal‑rank fusion util
  |   ├── retrieval/
- |   |   ├── 📄 media_retriever.py # Hybrid retriever with dense + sparse + filters + reranking
- |   |   ├── 📄 retriever.py       # Retriever interface / logic binding vectorstore + reranker
- |   |   └── 📄 vectorstore.py     # Qdrant client + query interface
+ │   │   ├── base_retriever.py  # Qdrant dense/sparse search; payloads
+ │   │   ├── query_encoder.py   # Dense + BM25 sparse for user query
+ │   │   ├── filter_builder.py  # Providers/genres/year filters → Qdrant Filter
+ │   │   └── vectorstore.py     # Qdrant client + connection
  |   ├── services/          
  |   |   ├── 📄 chatbot.py         # Main chat function: embeds, retrieves, calls LLM
  |   |   └── 📄 usage_logger.py    # Logs queries and results to Supabase
