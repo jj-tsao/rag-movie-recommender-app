@@ -8,21 +8,17 @@
 ![License](https://img.shields.io/github/license/jj-tsao/rag-movie-recommender-app)
 
 
-[Reelix](https://reelixai.netlify.app/) is an AI‑native discovery agent that turns a vibe‑style natural language query into cinematic recommendations. It leverages hybrid search (dense/semantic + sparse/BM25) with fine-tuned SentenceTransformer retriever (BGE), cross‑encoder reranker (BERT), real-time intent classification (DistilBERT), and LLM reasoning to dynamically craft markdown-rich recommendations with rationale, ratings, and trailers — streamed live to the frontend. 
+[Reelix](https://reelixai.netlify.app/) is an AI‑native discovery agent that turns a vibe‑style natural language query into cinematic recommendations. 
 
 Built with a modern full-stack architecture (FastAPI, React/Vite, Qdrant Vector DB, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and large language models to deliver rich, emotionally attuned viewing recommendations.
 
-From vibe-aware querying and streaming output to reranking by narrative relevance, Reelix blends AI retrieval, ranking, and generation into a seamless cinematic discovery experience.
-
-## 🌐 Live Product 
-
-👉 Try it here: [**Reelix AI**](https://reelixai.netlify.app/)
+It combines hybrid search (dense/semantic + sparse/BM25) using fine-tuned SentenceTransformer retriever (BGE), with cross‑encoder reranker (BERT), real-time intent   classification (DistilBERT), and LLM reasoning to dynamically craft markdown-rich recommendations with rationale, ratings, and trailers, streaming live to the frontend. 
 
 ---
 
-## ✨ What’s New (Pipeline v2)
+## ✨ What’s New (Recommendation Pipeline v2)
 
-Reelix now runs a 4‑stage recommendation pipeline with a fine‑tuned Cross‑Encoder (CE) reranker:
+Reelix now runs a 4‑stage recommendation pipeline with a fine‑tuned [Cross‑Encoder (CE) reranker](https://github.com/jj-tsao/rag-movie-reranker-training-pipeline/tree/main):
 
 1. Base Fusion (RRF) – Build a candidate pool by fusing top‑K results from dense semantic search and sparse BM25 (reciprocal‑rank fusion, k=60).
 
@@ -35,6 +31,11 @@ Reelix now runs a 4‑stage recommendation pipeline with a fine‑tuned Cross‑
 - CE fallback: if the CE model is unavailable, the system gracefully returns the metadata‑reranked list.
 
 ---
+
+## 🌐 Live Product 
+
+👉 Try it here: [**Reelix AI**](https://reelixai.netlify.app/)
+
 ## Preview
 
 > Reelix understands your vibe and curates markdown-rich suggestions, trailers, and rationale in real time.
@@ -45,12 +46,12 @@ Reelix now runs a 4‑stage recommendation pipeline with a fine‑tuned Cross‑
 ---
 ## 🔗 Related Projects
 
-- 🏋️ [Reranker Training](https://github.com/jj-tsao/rag-movie-reranker-training-pipeline/tree/main)
-- 📊 [Trained Cross-Encoder Reranker](https://huggingface.co/JJTsao/movietv-reranker-cross-encoder-base-v1) (`bert-base-uncased` backbone)
-- 🏋️ [Retriever Training](https://github.com/jj-tsao/rag-movie-training-pipeline)
-- 🧠 [Fine-Tuned Retriever Model](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5) (`bge-base-en-v1.5` based)
-- 🤖 [Fine-Tuned Intent Classifier Model](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot) (`distilbert-base-uncased` based)
-- 💬 [Data and Embedding Pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
+- [Reranker Training](https://github.com/jj-tsao/rag-movie-reranker-training-pipeline/tree/main)
+- [Trained Cross-Encoder Reranker](https://huggingface.co/JJTsao/movietv-reranker-cross-encoder-base-v1) (`bert-base-uncased` backbone)
+- [Retriever Training](https://github.com/jj-tsao/rag-movie-training-pipeline)
+- [Fine-Tuned Retriever Model](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5) (`bge-base-en-v1.5` based)
+- [Fine-Tuned Intent Classifier Model](https://huggingface.co/JJTsao/intent-classifier-distilbert-moviebot) (`distilbert-base-uncased` based)
+- [Data and Embedding Pipeline](https://github.com/jj-tsao/rag-movie-embedding-pipeline)
 ---
 
 ## ✨ Features
@@ -90,25 +91,34 @@ User prompt ──▶ Intent Classifier ──┐
                                     ▼
                             Query Encoder (dense + sparse)
                                     │
-                 ┌──────────────────┴──────────────┐
-                 ▼                                 ▼
-           Dense Search                        Sparse Search
-                 │                                 │
-                 └─────── RRF (pool build) ────────┘
+                 ┌──────────────────┴──────────────────┐
+                 ▼                                     ▼
+           Sparse Search                         Dense Search
+                 │                                     │
+                 └──────────────────┬──────────────────┘
+                                    │           
+                                    ▼           
+                 RRF #1: Candidate Pool (dense ⊕ sparse)
                                     │
-                             Metadata Rerank
-                                    │ (top 100)
-                                    ├─▶ take top 30 for CE
-                                    │
-                          Cross‑Encoder Rerank (top‑30)
-                                    │
-                    Final RRF: (meta‑top) ⊕ (CE‑top)
-                                    │
-                              Top‑K to LLM
                                     ▼
-                              UI Streaming
-```
+                        Metadata Rerank (top 100)
+                                    │
+                                    │                           (tap from DENSE top-30)
+                                    │                                      │
+                                    ▼                                      ▼
+                             Metadata Top-30                      Cross-Encoder Rerank
+                                    │                              (on dense top-30)
+                                    │                                      │
+                                    └───────────────────┬──────────────────┘
+                                                        ▼
+                                    RRF #2: Final Fusion (metadata-top ⊕ CE-top)
+                                                        │
+                                                        ▼
+                                                   Top-K to LLM
+                                                        ▼
+                                                  UI (streaming)
 
+```
 
 **Tunable knobs** (with sensible defaults):
 
@@ -117,20 +127,6 @@ User prompt ──▶ Intent Classifier ──┐
 - Metadata weights: `{dense: 0.60, sparse: 0.15, rating: 0.15, popularity: 0.10}`
 - CE window: `meta_ce_top_n=30`
 - Final size: `final_top_k=20`
-
----
-
-## 🔬 Tracing & Logging
-
-Each final candidate carries a **ScoreTrace** with:
-
-- `dense_rank`, `sparse_rank` – rank positions from initial searches
-- `meta_score` – metadata weighted score after normalization
-- `ce_score` – raw CE logit (per‑query normalized optionally)
-- `final_rrf` – score from the **final fusion** (used as `reranked_score` in logs)
-
-Supabase tables capture query metadata, per‑rank scores, and final recs (with why‑summaries) for evaluation.
-
 
 ---
 ## 🚀 Tech Stack
