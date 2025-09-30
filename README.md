@@ -10,9 +10,9 @@
 
 [Reelix](https://reelixai.netlify.app/) is an AI‑native discovery agent that turns a vibe‑style natural language query into cinematic recommendations. 
 
-Built with a modern full-stack architecture (FastAPI, React/Vite, Qdrant Vector DB, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and large language models to deliver rich, emotionally attuned viewing recommendations.
+Built with a modern full-stack architecture (FastAPI, React/Vite, Qdrant Vector DB, Supabase), Reelix leverages advanced retrieval-augmented generation (RAG) pipeline and custom-trained large language models (LLMs) to deliver rich, emotionally attuned viewing recommendations.
 
-It combines hybrid search (dense/semantic + sparse/BM25) using fine-tuned SentenceTransformer retriever (BGE), with cross‑encoder reranker (BERT), real-time intent   classification (DistilBERT), and LLM reasoning to dynamically craft markdown-rich recommendations with rationale, ratings, and trailers, streaming live to the frontend. 
+It combines hybrid search (dense/semantic + sparse/BM25) using fine-tuned SentenceTransformer retriever (BGE), cross‑encoder reranker (BERT), real-time intent understanding (DistilBERT), and LLM reasoning to dynamically craft markdown-rich recommendations with rationale, ratings, and trailers, streaming live to the frontend. 
 
 ---
 
