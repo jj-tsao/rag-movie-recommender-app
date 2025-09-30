@@ -57,10 +57,10 @@ Reelix now runs a 4‑stage recommendation pipeline with a fine‑tuned [Cross�
 ## ✨ Features
 
 - **Hybrid Retrieval + Reranking**:
-  - Dense semantic retrieval via fine‑tuned bge-base-en-v1.5
+  - Dense semantic retrieval via fine‑tuned `bge-base-en-v1.5`
   - Sparse keyword retrieval via BM25 (trained over curated "embedding_text")
   - Metadata rerank with Bayesian quality + log popularity anchors
-  - Fine‑tuned Cross‑Encoder reranker (BERT backbone) for pairwise relevance
+  - Fine‑tuned Cross‑Encoder reranker (`BERT` backbone) for pairwise relevance
   - Double‑RRF fusions for robustness (pre‑pool + final fusion)
 
 - **FastAPI Backend**:
