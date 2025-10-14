@@ -1,0 +1,147 @@
+name: Deploy API to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "apps/api/**"
+      - "packages/python/**"
+      - "packages/py-sdk/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hf-space-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync-space:
+    name: Sync backend to Hugging Face
+    runs-on: ubuntu-latest
+    env:
+      HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_DEPLOY_SKIP_RECOMMENDER_INIT: ${{ vars.REELIX_SKIP_RECOMMENDER_INIT }}
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "${HF_SPACE_ID}" ]; then
+            echo "::error ::Repository variable HF_SPACE_ID is not set (expected format owner/space-name)." >&2
+            exit 1
+          fi
+          if [ -z "${HF_TOKEN}" ]; then
+            echo "::error ::Repository secret HF_TOKEN is not set." >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install git-lfs
+        run: |
+          git lfs install --skip-repo
+
+      - name: Clone Hugging Face Space
+        run: |
+          rm -rf hf-space
+          git clone "https://huggingface:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}" hf-space
+
+      - name: Prepare Space contents
+        run: |
+          set -euo pipefail
+          SPACE_DIR="hf-space"
+          # Keep the Space repo clean while preserving its .git directory
+          find "${SPACE_DIR}" -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+
+          # Copy required assets into the Space checkout
+          mkdir -p "${SPACE_DIR}/apps/api" \
+                   "${SPACE_DIR}/packages/python" \
+                   "${SPACE_DIR}/packages/py-sdk"
+
+          RSYNC_FLAGS=(
+            -a
+            --delete
+            --exclude "__pycache__"
+            --exclude "*.zip"
+          )
+
+          rsync "${RSYNC_FLAGS[@]}" apps/api/ "${SPACE_DIR}/apps/api/"
+          rsync "${RSYNC_FLAGS[@]}" packages/python/ "${SPACE_DIR}/packages/python/"
+          rsync "${RSYNC_FLAGS[@]}" packages/py-sdk/ "${SPACE_DIR}/packages/py-sdk/"
+
+          # Copy top-level files needed for Docker build
+          install -D Dockerfile "${SPACE_DIR}/Dockerfile"
+          install -D .dockerignore "${SPACE_DIR}/.dockerignore"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          space_dir = Path("hf-space")
+          readme = space_dir / "README.md"
+          readme.write_text(
+              """---
+          title: Reelix Discovery Agent API
+          emoji: 🎬
+          colorFrom: blue
+          colorTo: indigo
+          sdk: docker
+          sdk_version: "0.0.1"
+          app_file: Dockerfile
+          pinned: false
+          ---
+
+          ## Overview
+          This Space mirrors the Reelix Discovery Agent FastAPI backend (`apps/api`) along with its shared Python packages.
+          It builds via the repository `Dockerfile` and exposes the API on port 7860.
+
+          ## Required Secrets
+          Configure these environment variables in the Space settings before launching:
+          - `QDRANT_ENDPOINT`
+          - `QDRANT_API_KEY`
+          - `SUPABASE_URL`
+          - `SUPABASE_API_KEY`
+          - `OPENAI_API_KEY`
+
+          ## Notes
+          - Model assets (`*.joblib`, `*.pickle`) are tracked with Git LFS.
+          - Set `REELIX_SKIP_RECOMMENDER_INIT=1` if you need to start without model downloads.
+          - Provide all API credentials and set `REELIX_SKIP_RECOMMENDER_INIT=0` to enable the full recommendation stack.
+          """.strip()
+              + "\n"
+          )
+          PY
+
+          cat <<'EOF' > "${SPACE_DIR}/.env.example"
+          # Copy to .env (or set via Space secrets) and fill with your credentials.
+          REELIX_SKIP_RECOMMENDER_INIT=1
+          QDRANT_ENDPOINT=
+          QDRANT_API_KEY=
+          SUPABASE_URL=
+          SUPABASE_API_KEY=
+          OPENAI_API_KEY=
+          EOF
+
+      - name: Configure Git LFS tracking
+        run: |
+          set -euo pipefail
+          SPACE_DIR="hf-space"
+          git -C "${SPACE_DIR}" lfs install --local
+          git -C "${SPACE_DIR}" lfs track "*.joblib" "*.pickle"
+
+      - name: Commit and push to Hugging Face
+        run: |
+          set -euo pipefail
+          SPACE_DIR="hf-space"
+          cd "${SPACE_DIR}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions@users.noreply.github.com"
+
+          if git status --short --untracked-files=all | grep -q .; then
+            git add .
+            git commit -m "Deploy ${GITHUB_SHA::7}"
+            git push origin HEAD
+          else
+            echo "No changes to deploy."
+          fi
