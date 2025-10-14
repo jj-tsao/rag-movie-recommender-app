@@ -22,7 +22,7 @@ Under the hood, it combines:
 - **Cross-Encoder reranker** for precise final ordering
 - **LLM “why you’ll enjoy it”** rationales, streamed via **SSE** to the UI
 
-The result is a fast, **personal For-You recommendation feed** and a flexible **“Explore by vibe”** experience that adapts as you give feedback.
+The result is a fast, **personal For-You recommendation feed** and a flexible **“Explore by Vibe”** experience that adapts as you give feedback.
 
 👉 Try our **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
 
@@ -58,7 +58,7 @@ User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Met
 - **Sparse**: BM25 with tokenization/stop‑word cleanup
 - **Reranking**: weighted blend of semantic + sparse + quality + popularity (+ optional genre overlap)
 - **CE**: `BERT` Cross‑Encoder pairwise reranker
-- **Streaming**: reasons & markdown delivered as newline-delimited JSON over SSE
+- **Streaming**: reasons & markdown are delivered as **newline-delimited JSON over SSE**.
 - **Bootstrap & Lifespan**: loads intent classifier, embedder, BM25, CE reranker, Qdrant client, and configures ticket store.
 - **Orchestrator**: Recipes (`interactive`, `for_you_feed`) define inputs (query vs taste), retrieval params, and LLM prompt envelopes.
 
@@ -68,26 +68,28 @@ User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Met
 
 ### 1) Taste Onboarding (`/taste`)
 Create a personal taste vector from your likes/dislikes and genre/vibe signals. The service builds and stores a dense taste profile, with endpoints to **inspect** and **rebuild** your profile:
-1) `POST /taste_profile/rebuild`
-   Rebuilds from interactions and persists to Supabase
-3) `GET /taste_profile/me`
-   Returns last build metadata & vector dim
+
+1) `POST /taste_profile/rebuild`  
+   Rebuilds from interactions and persists to Supabase.
+
+2) `GET /taste_profile/me`  
+   Returns last build metadata & vector dim.
 
 Under the hood, the rebuild process fetches user signals, loads item embeddings from Qdrant, and calls `build_taste_vector(...)`, then upserts the profile.
 
 ### 2) For-You Feed (`/discover`)
-Your **For-You** page streams personalized reasons (and markdown rich movie/tv profile) per item in real-time. The flow is a two-step ticketed orchestration:
+Your **For-You** page streams personalized reasons (and a markdown-rich movie/TV profile) per item in real time. The flow is a two-step ticketed orchestration:
 
 1) `POST /discovery/for-you`  
-   Returns the candidate list plus a `stream_url` for reasons.
+   Returns the candidate list with metadata (year, genres, posters, trailers, etc.) plus a `stream_url` for reasons.
 
 2) `GET /discovery/for-you/why?query_id=...` (SSE)  
    Streams events `{started, why_delta, done}` where `why_delta` includes `media_id`, optional `imdb_rating` and `rotten_tomatoes_rating`, and `why_you_might_enjoy_it` markdown.
 
-The endpoint uses a **ticket store** (memory or Redis) with idle and absolute TTLs to hold LLM prompts and guard access by user id.
+The endpoint uses a **ticket store** (memory or Redis) with idle and absolute TTLs to hold LLM prompts and guard access by user ID.
 
 ### 3) Vibe Query (`/query`)
-Explore by vibe with free-form natural language and optional filters (providers, genres, release years, media type).
+Explore by Vibe with free-form natural language and optional filters (e.g., streaming services). This uses a single streaming endpoint: we retrieve ~20 candidates, pass to LLM as context, LLM selects the finals and writes “Why,” and we stream that back to the client.
 
 1) `POST /recommendations/interactive`
 - Runs the interactive recipe (dense + BM25 + metadata + CE reranker) to fetch ~20 top candidates.  
@@ -177,9 +179,9 @@ User prompt ──▶ Intent Classifier ──┐
 3. Intent classifier routes to recommendation (as opposed to general chat)
 4. Query is embedded (dense + sparse)
 5. Qdrant retrieves top-300 matches via dense and sparse vector search
-6. Retrieved medias are re-ranked based on semantic, keywords, rating, and popularity
-7. Top-20 reranked results are sent to LLM for final recommendation and summary
-8. UI streams response card-by-card with poster, rating, metadata, rationale, and trailer link
+6. Retrieved titles are reranked by semantic, sparse, rating, popularity, and recency
+7. Top-20 reranked results are sent to the LLM for final selection and summary
+8. UI streams cards with poster, rating, metadata, rationale, and trailer link
 9. Final selections are logged to Supabase
 
 ---
