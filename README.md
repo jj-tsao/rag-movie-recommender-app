@@ -49,9 +49,9 @@ Taste Signals ──▶ Taste Vector ────┐
                                    │
                                    ▼
 User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Metadata Rerank ──▶ CE Rerank ──▶ Final Fusion (RRF#2) ──▶ LLM "Why"
-                                   ▲                                                             │
-                                   │                                                             ▼
-                               Filters (Streaming services/genres/year)                       SSE stream to UI
+                                   ▲                                                                                   │
+                                   │                                                                                   ▼
+                               Filters (Streaming services/genres/year)                                        SSE stream to UI
 ```
 
 - **Dense**: fine‑tuned `bge-base-en-v1.5` embeddings
