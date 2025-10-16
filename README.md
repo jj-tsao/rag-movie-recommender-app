@@ -48,10 +48,10 @@ The result is a fast, **personal For-You recommendation feed** and a flexible **
 Taste Signals ──▶ Taste Vector ────┐
                                    │
                                    ▼
-User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Metadata Rerank ──▶ CE Rerank ──▶ Final Fusion (RRF#2) ──▶ LLM "Why"
-                                   ▲                                                                                   │
-                                   │                                                                                   ▼
-                               Filters (Streaming services/genres/year)                                        SSE stream to UI
+User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Metadata Rerank ──▶ CE Rerank ──▶ Final Fusion (RRF#2) ──▶ LLM "Why" ──▶ Log final recs
+                                   ▲                                                             │                     │
+                                   │                                                             ▼                     ▼
+                            Filters (Streaming services/genres/year)                     JSON response to UI       SSE stream to UI
 ```
 
 - **Dense**: fine‑tuned `bge-base-en-v1.5` embeddings
@@ -67,37 +67,50 @@ User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Met
 ## 🌐 Key API Endpoints
 
 ### 1) Taste Onboarding (`/taste`)
-Create a personal taste vector from your likes/dislikes and genre/vibe signals. The service builds and stores a dense taste profile, with endpoints to **inspect** and **rebuild** your profile:
+Build and maintain a personalized **taste vector** from your interactions and preferences. Stores profile state in Supabase and powers the For-You feed and Vibe Query ranking.
 
-1) `POST /taste_profile/rebuild`  
-   Rebuilds from interactions and persists to Supabase.
+1) `POST /taste_profile/rebuild`
+   - Aggregates **user signals**: recent interactions (e.g., Love / Like / Not for me, trailer views), selected genres/vibes, and any provider filters.
+   - Fetches the corresponding **item embeddings** from Qdrant and computes a **taste vector** (weighted aggregation + normalization).
+   - **Upserts** the profile into Supabase, recording metadata such as `vector_dim`, `n_signals_used`, `build_version`, and timestamps.
 
-2) `GET /taste_profile/me`  
-   Returns last build metadata & vector dim.
-
+3) `GET /taste_profile/me`
+   - Returns the latest **profile metadata** and a safe subset of fields for inspection.
+   - Useful for gating UX (“has profile been built?”) and for debugging profile freshness across sessions.
+   
 Under the hood, the rebuild process fetches user signals, loads item embeddings from Qdrant, and calls `build_taste_vector(...)`, then upserts the profile.
 
 ### 2) For-You Feed (`/discover`)
-Your **For-You** page streams personalized reasons (and a markdown-rich movie/TV profile) per item in real time. The flow is a two-step ticketed orchestration:
+Your **For-You** page streams personalized reasons (and a markdown-rich movie/TV profile) per item in real time. Uses a **ticket store** (keyed by `query_id`) with **idle** and **absolute** TTLs to bound prompt/candidate lifespan and prevent stale cross-user access.
 
-1) `POST /discovery/for-you`  
-   Returns the candidate list with metadata (year, genres, posters, trailers, etc.) plus a `stream_url` for reasons.
+1) `POST /discovery/for-you`
+   - Queries the user’s taste profile from the database.
+   - Runs the **for_you_feed** recipe (dense + BM25 + metadata + CE reranker) against the **user taste context** to fetch **Top-K** candidates.
+   - Builds the LLM prompt with those candidates and **persists it in the ticket store** (keyed by `query_id`).
+   - Returns the candidate list with metadata (year, genres, posters, trailers, etc.) **plus** a `stream_url` for reasons.
+   - Logs a **query-intake record** and a **Top-K candidate snapshot** (IDs, ranks, and **per-signal score traces**) to the database.
 
-2) `GET /discovery/for-you/why?query_id=...` (SSE)  
-   Streams events `{started, why_delta, done}` where `why_delta` includes `media_id`, optional `imdb_rating` and `rotten_tomatoes_rating`, and `why_you_might_enjoy_it` markdown.
+3) `GET /discovery/for-you/why?query_id=...` (SSE)
+   - Reads the LLM prompt and Top-K candidates from the ticket store.
+   - Performs LLM reasoning to generate concise “why you might enjoy it” copy.
+   - Streams events `{started, why_delta, done}` where `why_delta` includes `media_id`, optional `imdb_rating` and `rotten_tomatoes_rating`, and `why_you_might_enjoy_it` (markdown).
 
-The endpoint uses a **ticket store** (memory or Redis) with idle and absolute TTLs to hold LLM prompts and guard access by user ID.
+5) `POST /discovery/log/final_recs`
+   - Client posts the final chosen items **and** reasoning (after streaming completes).
+   - Upserts existing rows with `stage="final"` and the `why_summary`.
 
 ### 3) Vibe Query (`/query`)
-Explore by Vibe with free-form natural language and optional filters (e.g., streaming services). This uses a single streaming endpoint: we retrieve ~20 candidates, pass to LLM as context, LLM selects the finals and writes “Why,” and we stream that back to the client.
+Uses a **single streaming endpoint**, with a shared **ticket store** (keyed by `query_id`) and **idle/absolute TTLs** to bound prompt/candidate lifespan and prevent stale cross-user access.
 
 1) `POST /recommendations/interactive`
-- Runs the interactive recipe (dense + BM25 + metadata + CE reranker) to fetch ~20 top candidates.  
-- Builds the LLM prompt with those candidates and (if signed in) your taste context.  
-- **Streams** the final recommendations **and** their “why” write-ups directly as the response body (text stream).
+   - Runs the **interactive** recipe (dense + BM25 + metadata + CE reranker) against the user's **text query** and **taste context** to fetch **Top-K** candidates.
+   - Builds the LLM prompt with those candidates and performs LLM reasoning to generate concise “why you might enjoy it” copy.
+   - **Streams** the final recommendations **and** their “why” write-ups directly as the response body (text stream).
+   - Logs a **query-intake record** and a **Top-K candidate snapshot** (IDs, ranks, and **per-signal score traces**) to the database.
 
-This flow uses the same ticket store (memory or Redis) with idle and absolute TTLs to hold LLM prompts and guard access by user id.
-
+3) `POST /recommend/log/final_recs`
+   - Client posts the final chosen items **and** reasoning (after streaming completes).
+   - Upserts existing rows with `stage="final"` and the `why_summary`.
 
 ### **Frontend details**
 - `/discover` loads a grid of picks, then begins SSE streaming of “why” and ratings, updating each card live.
