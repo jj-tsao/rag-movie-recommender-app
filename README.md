@@ -1,4 +1,4 @@
-# 🎬 Reelix AI – Personalized Movie & TV Show Discovery
+# 🎬 Reelix AI – Personalized Movie & TV Discovery Agent
 
 **Reelix** is an AI-native discovery agent that understands *vibes* and turns them into cinematic picks.
 
