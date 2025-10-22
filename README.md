@@ -112,6 +112,27 @@ Uses a **single streaming endpoint**, with a shared **ticket store** (keyed by `
    - Client posts the final chosen items **and** reasoning (after streaming completes).
    - Upserts existing rows with `stage="final"` and the `why_summary`.
 
+### 4) Watchlist (`/watchlist`)
+Lets users save titles to watch later, mark them as watched, and optionally rate them (1–10). Designed to be idempotent and fast, with optimistic UI updates. Stores rows in Supabase (unique on `user_id` + `media_id`) and emits lightweight signals that feed back into the taste profile.
+
+1) `POST /watchlist`
+   - Adds or upserts an item in the user’s watchlist (reactivates if previously soft-deleted).
+   - Input fields like `title`, `poster_url`, etc. are denormalized hints to render immediately; canonical metadata lives in Qdrant/TMDB.
+   - Emits an interaction event (`watchlist_add`) for taste-signal logging.
+  
+2) `GET /watchlist`
+   - Lists the user’s watchlist items, with optional filters/pagination.
+   - Hydrates metadata fields like genres, release_year, artworks, and why_summary, so the client avoids a second fetch.
+
+3) `PATCH /watchlist/{media_id}`
+   - Atomically updates status and/or rating (ideal for “✓ Watched ▾ → quick-rate”).
+   - Emits an interaction event (`rating`) when a rating is present for taste-signal logging.
+
+4) `DELETE /watchlist/{media_id}`
+   - Remove from watchlist.
+   - Soft delete the item. Sets `deleted_at`, `deleted_reason`, and derives `is_active=False`.
+
+
 ### **Frontend details**
 - `/discover` loads a grid of picks, then begins SSE streaming of “why” and ratings, updating each card live.
 - Users can **Love / Like / Not for me** or **watch trailer**; feedback is logged and triggers controlled taste rebuilds.
