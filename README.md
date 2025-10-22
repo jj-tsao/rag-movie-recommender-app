@@ -32,6 +32,7 @@ The result is a fast, **personal For-You recommendation feed** and a flexible **
 - **Taste Onboarding (`/taste`)** — Quickly signal your preferences (genre/vibe picks; Love / Like / Dislike; trailer views). We build and store a taste vector that refines as you give more feedback.
 - **For-You Feed (`/discover`)** — A personalized grid of picks. Each card streams a short rationale and a markdown-rich movie/TV card.
 - **Explore by Vibe (`/query`)** — Type “psychological thrillers with a satirical tone,” or tap example chips to see vibe-specific recommendations. Add filters for year range, genres, and streaming services.
+- **Add to Watchlist (`/watchlist`)** - Save titles to watch later, flip to “Watched,” and (optionally) rate 1–10 — all in one flow. Optimistic UI + idempotent API; items hydrate with metadata/artworks and emit signals to refine your taste profile.
 
 ### Quick Look
 
@@ -178,9 +179,9 @@ User prompt ──▶ Intent Classifier ──┐
 
 **Tunable knobs** (with sensible defaults):
 
-- Retrieval depths: `dense_depth=300`, `sparse_depth=20`
+- Retrieval depths: `dense_depth=300`, `sparse_depth=100`
 - Fusion: `rrf_k=60`
-- Metadata weights: `{dense: 0.60, sparse: 0.15, rating: 0.15, popularity: 0.10}`
+- Metadata weights: `{dense=0.56, sparse=0.14, rating=0.14, popularity=0.04, genre=0.12,}`
 - CE window: `meta_ce_top_n=30`
 - Final size: `final_top_k=20`
 
