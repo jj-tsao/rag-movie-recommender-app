@@ -147,11 +147,13 @@ Lets users save titles to watch later, mark them as watched, and optionally rate
 ## 🏗️ Recommendation Pipeline Architecture (High‑Level)
 
 ```
-User prompt ──▶ Intent Classifier ──┐
-                                    │ yes
-                                    ▼
-                            Query Encoder (dense + sparse)
+User Interactions ──▶ Taste Vector (user tower)
                                     │
+                                    │
+User Prompt ──▶ Query Encoder ──────┤
+                                    │ 
+                                  Filters (genres, year, streaming provider)
+                                    │ 
                  ┌──────────────────┴──────────────────┐
                  ▼                                     ▼
            Sparse Search                         Dense Search
