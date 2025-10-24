@@ -14,13 +14,17 @@
 
 Reelix finds your next favorite movies/shows by learning your **personal taste** and the **vibes** you want (themes, tone, pacing, genres).
 
-Under the hood, it combines:
+Under the hood, it’s a **hybrid, two-tower (model-based collaborative filtering)** system:
 
-- **Taste vector (SentenceTransformers)** to model what you like (and don’t)
-- **Hybrid retrieval (dense embeddings + BM25)** to surface high-signal candidates
-- **Metadata-aware reranking** (quality, popularity, genre overlap, recency)
-- **Cross-Encoder reranker** for precise final ordering
-- **LLM “why you’ll enjoy it”** rationales, streamed via **SSE** to the UI
+- **Taste vector (user tower):** aggregates embeddings from your interactions to model what you like (and don’t).
+- **Item embeddings (item tower):** SentenceTransformers for content-aware dense representations of titles.
+- **Hybrid retrieval:** approximate nearest neighbor (ANN) over dense embeddings + BM25 to surface high-signal candidates.
+- **Two-stage ranking:**
+  1. Metadata-aware scoring (quality, popularity, recency, provider, genre/diversity)
+  2. **Cross-Encoder** reranker for precise final order.
+- **LLM rationales:** “Why you’ll enjoy it” explanations streamed to the UI via SSE.
+- **Cold start ready:** falls back to content signals until interactions accumulate.
+
 
 The result is a fast, **personal For-You recommendation feed** and a flexible **“Explore by Vibe”** experience that adapts as you give feedback.
 
