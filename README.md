@@ -12,21 +12,19 @@
 
 ---
 
-Reelix finds your next favorite movies/shows by learning your **personal taste** and the **vibes** you want (themes, tone, pacing, genres).
+Reelix finds your next favorite watch by learning your **personal taste** and preferred **vibes** (themes, tone, pacing, genres).
 
-Under the hood, it’s a RAG-based natural language search and recommendaion system:
+Under the hood, it mirrors a modern RAG-driven AI search stack: **candidate recall** → **multi-objective ranking** → **grounded LLM synthesis**, all within strict latency/quality budgets.
 
-- **Taste vector (user tower):** aggregates embeddings from your interactions to model what you like (and don’t).
-- **Item embeddings (item tower):** SentenceTransformers for content-aware dense representations of titles.
-- **Hybrid retrieval:** approximate nearest neighbor (ANN) over dense embeddings + BM25 to surface high-signal candidates.
-- **Two-stage ranking:**
-  1. Metadata-aware scoring (quality, popularity, recency, provider, genre/diversity)
-  2. **Cross-Encoder** reranker for precise final order.
-- **LLM rationales:** “Why you’ll enjoy it” explanations streamed to the UI via SSE.
-- **Cold start ready:** falls back to content signals until interactions accumulate.
+- **Query understanding**: Parse natural-language “vibe” queries into **dense** (fine-tuned SentenceTransformers) + **sparse** (BM25) signals.
+- **Hybrid retrieval**: ANN over dense vectors + BM25; RRF/weighted fusion builds a robust top-K.
+- **Two-stage ranking (multi-objective)**:
+  1. **Metadata-aware scorer** (content quality, popularity, freshness, diversity/de-dupe).
+  2. **Cross-Encoder reranker** for precise final order at small K.  
+- **Personalization**: **User-tower** taste vector from interactions (like/watch/skip); cold-start uses content priors.
+- **Grounded LLM synthesis**: Generate “Why you’ll like it” rationales and stream via SSE.
 
-
-The result is a fast, **personal For-You recommendation feed** and a flexible **“Explore by Vibe”** experience that adapts as you give feedback.
+The result is a fast **For-You feed** and a flexible **“Explore by Vibe”** search experience that adapt in real time as users interact.
 
 👉 Try our **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
 
@@ -34,8 +32,8 @@ The result is a fast, **personal For-You recommendation feed** and a flexible **
 ## ✨ Core Experiences
 
 - **Taste Onboarding (`/taste`)** — Quickly signal your preferences (genre/vibe picks; Love / Like / Dislike; trailer views). We build and store a taste vector that refines as you give more feedback.
-- **For-You Feed (`/discover`)** — A personalized grid of picks. Each card streams a short rationale and a markdown-rich movie/TV card.
 - **Explore by Vibe (`/query`)** — Type “psychological thrillers with a satirical tone,” or tap example chips to see vibe-specific recommendations. Add filters for year range, genres, and streaming services.
+- **For-You Feed (`/discover`)** — A personalized grid of picks. Each card streams a short rationale and a markdown-rich movie/TV card.
 - **Add to Watchlist (`/watchlist`)** - Save titles to watch later, flip to “Watched,” and (optionally) rate 1–10 — all in one flow. Optimistic UI + idempotent API; items hydrate with metadata/artworks and emit signals to refine your taste profile.
 
 ### Quick Look
