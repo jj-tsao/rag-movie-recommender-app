@@ -14,7 +14,7 @@
 
 Reelix finds your next favorite movies/shows by learning your **personal taste** and the **vibes** you want (themes, tone, pacing, genres).
 
-Under the hood, it’s a **hybrid, two-tower (model-based collaborative filtering)** system:
+Under the hood, it’s a RAG-based natural language search and recommendaion system:
 
 - **Taste vector (user tower):** aggregates embeddings from your interactions to model what you like (and don’t).
 - **Item embeddings (item tower):** SentenceTransformers for content-aware dense representations of titles.
