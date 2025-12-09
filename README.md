@@ -53,8 +53,6 @@ Under the hood, this agentic system uses:
 The result is a fast, AI-led natural language **“Explore by Vibe”** and **For-You feed** experience that **adapts** in real time as users interact.
 
 
-
-
 ---
 ## ✨ Core Experiences
 
@@ -79,25 +77,102 @@ The result is a fast, AI-led natural language **“Explore by Vibe”** and **Fo
 
 ---
 
-## 🧠 How It Works (At a Glance)
+## 🧠 How It Works – Agentic Workflow at a Glance
 
-```
-Taste Signals ──▶ Taste Vector ────┐
-                                   │
-                                   ▼
-User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Metadata Rerank ──▶ CE Rerank ──▶ Final Fusion (RRF#2) ──▶ LLM "Why" ──▶ Log final recs
-                                   ▲                                                             │                     │
-                                   │                                                             ▼                     ▼
-                            Filters (Streaming services/genres/year)                     JSON response to UI       SSE stream to UI
+At runtime, Reelix is a **three-agent system** sitting on top of a hybrid retrieval + ranking engine:
+
+```text
+Taste Signals ──▶ Taste Vector ─────────────┐
+                                            │
+User Query ───────────────┐                 │
+                          ▼                 │
+                 Orchestrator Agent ◀───────┘
+                          │
+                          ▼
+               Retrieval & Ranking Agent
+                          │
+                          ▼
+             Reasoning & Explanation Agent
+                          │
+     ┌────────────────────┴────────────────────┐
+     ▼                                         ▼
+ JSON / SSE to UI                      Logs + Cache (Supabase / Redis)
+                                               │
+                                               ▼
+                                    Taste Updates, Analysis, Retraining
 ```
 
-- **Dense**: fine‑tuned `bge-base-en-v1.5` embeddings
-- **Sparse**: BM25 with tokenization/stop‑word cleanup
-- **Reranking**: weighted blend of semantic + sparse + quality + popularity (+ optional genre overlap)
-- **CE**: `BERT` Cross‑Encoder pairwise reranker
-- **Streaming**: reasons & markdown are delivered as **newline-delimited JSON over SSE**.
-- **Bootstrap & Lifespan**: loads intent classifier, embedder, BM25, CE reranker, Qdrant client, and configures ticket store.
-- **Orchestrator**: Recipes (`interactive`, `for_you_feed`) define inputs (query vs taste), retrieval params, and LLM prompt envelopes.
+### 1) Orchestrator Agent
+
+**Agentic orchestration layer** — *“What should we do next?”*
+
+- **Understands intent from conversation**  
+  Parses the current query plus recent turns to infer what the user is trying to do:
+  - Explore by Vibe, refresh For-You, refine results, focus on a franchise/actor, adjust filters, etc.
+
+- **Builds a small, explicit plan**  
+  - Derives retrieval needs (dense vs. sparse depth)  
+  - Assembles filters (genres, year range, streaming providers)  
+  - Decides how much personalization to apply (taste vector, recent interactions)
+
+- **Routes to other agents and tools**  
+  - Calls the **Retrieval & Ranking Agent** with the constructed plan to get a high-quality candidate set  
+  - Calls the **Reasoning & Explanation Agent** to generate “Why you might enjoy it” rationales for those candidates  
+  - Can trigger taste profile updates or logging flows when appropriate
+
+- **Handles multi-turn refinement**  
+  - Treats follow-ups as **plan edits** rather than isolated queries  
+  - Preserves `query_id` and ticket-store state so downstream tools keep operating over the same evolving candidate pool instead of starting from scratch each time
+
+
+### 2) Retrieval & Ranking Agent
+
+**Hybrid retrieval + multi-stage ranking** — *“What are the best candidates?”*
+
+- **Hybrid retrieval (RAG-style)**  
+  - Calls into Qdrant + BM25 to build a high-quality candidate set:  
+    - Dense retrieval over fine-tuned `bge-base-en-v1.5` embeddings  
+    - Sparse retrieval via BM25 over normalized text  
+    - RRF / weighted fusion to merge dense + sparse signals
+
+- **Metadata-aware reranking**  
+  - Rating, popularity, recency/freshness  
+  - Optional genre / vibe alignment  
+  - Diversity / de-dupe to avoid franchise spam and near-duplicates
+
+- **Cross-encoder + LLM vibe pass**  
+  - Runs a **cross-encoder reranker** on a small window (e.g. top-30), then fuses CE scores back into the final ranking  
+  - Optionally calls an LLM on a small candidate pool to score how well each title matches the user’s free-form vibe description and feeds that signal back into ranking
+
+- **Output**  
+  Returns a **ranked candidate set with score traces** that can be logged, inspected, and used downstream.
+
+### 3) Reasoning & Explanation Agent
+
+**Reasoning & explanation + streaming** — *“Why these, and what next?”*
+
+- **Consumes**  
+  - Ranked candidates from the Retrieval & Ranking Agent  
+  - The user’s taste profile and recent interactions  
+  - The current mode (Explore by Vibe vs. For-You)
+
+- **Builds structured prompts to**  
+  - Generate “**Why you might enjoy it**” copy per title  
+  - Avoid self-references or obvious hallucinations  
+  - Produce markdown-friendly output for movie/TV cards
+
+- **Streams results via SSE / JSONL**  
+  - `started` → incremental `why_delta` events per `media_id` → `done`  
+  - Writes the final “why” copy and associated metadata to Supabase and Redis for reuse
+
+
+### 4) Signals, feedback loops & taste updates
+
+- Logs final recs and user feedback (interactions, ratings, watchlist actions) into Supabase + Redis.  
+- Aggregates these signals into an updated **taste vector**, which the Orchestrator Agent pulls into future plans.  
+- Exposes rich logged signals (scores, why-copy, interaction outcomes) for **offline analysis** and future **model / ranking retraining**.
+
+Over time, these feedback loops turn Reelix into a richer **discovery agent**, not just a static recommender: it can adapt its plans, retrieval parameters, and even suggestion style based on how you interact.
 
 ---
 
