@@ -12,21 +12,45 @@
 
 ---
 
-Reelix finds your next favorite watch by learning your **personal taste** and preferred **vibes** (themes, tone, pacing, genres).
+Reelix finds your next favorite watch by learning your **personal preferences**, evolving **taste**, and preferred **vibes** (themes, tone, pacing, genres).
 
-Under the hood, it mirrors a modern RAG-driven AI search stack: **candidate recall** → **multi-objective ranking** → **grounded LLM synthesis**, all within strict latency/quality budgets.
+Architecturally, Reelix is an **AI-native discovery agent** built on top of a modern **hybrid recommendation system**. A small team of collaborating agents (Orchestrator, Retrieval & Ranking, Reasoning & Explanation) sits above dense + sparse retrieval, metadata-aware / cross-encoder reranking, and LLM-based explainability.
 
-- **Query understanding**: Parse natural-language “vibe” queries into **dense** (fine-tuned SentenceTransformers) + **sparse** (BM25) signals.
-- **Hybrid retrieval**: ANN over dense vectors + BM25; RRF/weighted fusion builds a robust top-K.
-- **Two-stage ranking (multi-objective)**:
-  1. **Metadata-aware scorer** (content quality, popularity, freshness, diversity/de-dupe).
-  2. **Cross-Encoder reranker** for precise final order at small K.  
-- **Personalization**: **User-tower** taste vector from interactions (like/watch/skip); cold-start uses content priors.
-- **Grounded LLM synthesis**: Generate “Why you’ll like it” rationales and stream via SSE.
+Under the hood, this agentic system uses:
 
-The result is a fast **For-You feed** and a flexible **“Explore by Vibe”** search experience that adapt in real time as users interact.
+- **Agentic workflow (3 collaborating agents)**  
+  - **Orchestrator Agent** — parses user queries + recent context, infers intent, and keeps a structured plan (retrieval depth, filters, personalization inputs) and short-term session memory alive across multi-turn interactive iterations.  
+
+  - **Retrieval & Ranking Agent** — executes that plan with a **RAG-based, hybrid retrieval pipeline**: dense + sparse (BM25) retrieval over the catalog, fusion, metadata/cross-encoder reranking, and a final LLM vibe-matching pass over a small candidate pool.  
+
+  - **Reasoning & Explanation Agent** — takes the ranked candidates + taste profile and generates grounded “Why you might enjoy it” rationales, streaming them to the UI and writing them to Supabase + Redis as logged signals for reuse, taste profile updates, offline analysis, and model / ranking retraining.
+
+- **Hybrid retrieval engine**  
+  - **Query encoding & expansion** — take natural-language vibe queries (“neo-noir psychological thriller”, “slow-burn sci-fi drama”) and turn them into dense + sparse signals (embeddings, BM25 terms, optional expansions / boosts by LLM).  
+  - **Dense** — fine-tuned SentenceTransformers (`bge-base-en-v1.5`) over titles, synopsis, and curated metadata.  
+  - **Sparse** — BM25 over cleaned text for lexical precision and long-tail matches.  
+  - **Fusion** — ANN over dense vectors + BM25 ranked lists, combined with RRF / weighted fusion to build a robust candidate set.
+
+- **Multi-stage ranking (multi-objective)**  
+  - A **metadata-aware scorer** combines content quality, popularity, freshness, and diversity / de-dupe objectives.  
+  - A **cross-encoder reranker** re-scores a small window (e.g. top-30) for precise final ordering.  
+  - **LLM-assisted vibe matching (narrow pass)** — for a small candidate pool, the Retrieval & Ranking Agent can call an LLM to score how well each title matches the user’s free-form vibe description and feed that signal back into ranking.
+
+- **Personalization**  
+  - A **user taste vector** built from interactions (love / like / dislike, star ratings, watchlist, trailer watch, etc.).  
+  - Cold-start behavior falls back to content-centric priors (global popularity / quality) plus explicit user preference signals (genres, services, etc.).
+
+
+- **Grounded LLM synthesis**  
+  - The **Reasoning & Explanation Agent** generates “Why you might enjoy it” rationales grounded in the ranked candidates + taste profile.  
+  - Results are streamed via SSE to the UI and cached in Supabase + Redis for reuse.
+
+
+The result is a fast, AI-led natural language **“Explore by Vibe”** and **For-You feed** experience that **adapts** in real time as users interact.
+
 
 👉 Try our **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
+
 
 ---
 ## ✨ Core Experiences
