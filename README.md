@@ -38,7 +38,7 @@ Under the hood, this agentic system uses:
 - **Multi-stage ranking (multi-objective)**  
   - A **metadata-aware scorer** combines content quality, popularity, freshness, and diversity / de-dupe objectives.  
   - A **cross-encoder reranker** re-scores a small window (e.g. top-30) for precise final ordering.  
-  - **LLM-assisted vibe matching (narrow pass)** — for a small candidate pool, the Retrieval & Ranking Agent can call an LLM to score how well each title matches the user’s free-form vibe description and feed that signal back into ranking.
+  - **LLM-assisted vibe matching** (narrow pass) — an LLM score is blended into ranking for a small candidate pool, improving alignment to the user’s free-form vibe.
 
 - **Personalization**  
   - A **user taste vector** built from interactions (love / like / dislike, star ratings, watchlist, trailer watch, etc.).  
@@ -57,7 +57,7 @@ The result is a fast, AI-led natural language **“Explore by Vibe”** and **Fo
 ## ✨ Core Experiences
 
 - **Taste Onboarding (`/taste`)**  
-  Quickly signal your preferences (genre / vibe picks; Love / Like / Dislike;). The agents use this to initialize your **user taste vector**, which the Orchestrator Agent pulls into every subsequent plan and refines as you give more feedback.
+  Quickly signal your preferences (genre / vibe picks; Love / Like / Dislike). The agents use this to initialize your **user taste vector**, which the Orchestrator Agent pulls into every subsequent plan and refines as you give more feedback.
 
 - **Explore by Vibe (`/query`)**  
   Type “psychological thrillers with a satirical tone”. The **Orchestrator Agent** parses your natural-language vibe, builds a retrieval plan (depth, filters, personalization), and calls the **Retrieval & Ranking Agent** + **Reasoning & Explanation Agent** to stream back grounded, vibe-matched recommendations.
@@ -152,7 +152,7 @@ User Query ───────────────┐                 │
 **Hybrid retrieval + multi-stage ranking layer** — *“What are the best candidates?”*
 
 - **Hybrid retrieval (RAG-style)**  
-  - Calls into Qdrant dense embedding + BM25 to build a high-quality candidate set:  
+  - Calls into Qdrant dense + sparse (BM25) to build a high-quality candidate set:  
     - Dense retrieval over fine-tuned `bge-base-en-v1.5` embeddings  
     - Sparse retrieval via BM25 over normalized text  
     - RRF / weighted fusion to merge dense + sparse signals
@@ -315,6 +315,15 @@ User Prompt ──▶ Query Encoder ──────┤
                                                   UI (streaming)
 
 ```
+
+- **Dense**: fine‑tuned `bge-base-en-v1.5` embeddings
+- **Sparse**: BM25 with tokenization/stop‑word cleanup
+- **Reranking**: weighted blend of semantic + sparse + quality + popularity (+ optional genre overlap)
+- **CE**: `BERT` Cross‑Encoder pairwise reranker
+- **Streaming**: reasons & markdown are delivered as **newline-delimited JSON over SSE**.
+- **Bootstrap & lifespan** — on startup, the backend loads the embedder, BM25 index, CE reranker, Qdrant client, config, and ticket store.
+- **Pipeline / recipe runner** — the FastAPI layer maps each request to a small set of pipeline “recipes” (`interactive`, `for_you_feed`, etc.) that define inputs (query vs. taste), retrieval params, and LLM prompt envelopes, and then invokes the three-agent workflow with the defaults.
+
 
 **Tunable knobs** (with sensible defaults):
 
