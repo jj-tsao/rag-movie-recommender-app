@@ -23,9 +23,9 @@ Architecturally, Reelix is an **AI-native discovery agent** built on top of a mo
 Under the hood, this agentic system uses:
 
 - **Agentic workflow (3 collaborating agents)**  
-  - **Orchestrator Agent** — parses user queries + recent context, infers intent, and keeps a structured plan (retrieval depth, filters, personalization inputs) and short-term session memory alive across multi-turn interactive iterations.  
+  - **Orchestrator Agent** — parses user queries + recent context, infers intent, and keeps a structured plan (retrieval shape, filters, personalization inputs, etc.) and short-term session memory alive across multi-turn interactive iterations.
 
-  - **Retrieval & Ranking Agent** — executes that plan with a **RAG-based, hybrid retrieval pipeline**: dense + sparse (BM25) retrieval over the catalog, fusion, metadata/cross-encoder reranking, and a final LLM vibe-matching pass over a small candidate pool.  
+  - **Retrieval & Ranking Agent** — executes that plan with a **RAG-based, hybrid retrieval pipeline**: dense + sparse (BM25) retrieval over the catalog, fusion, metadata/cross-encoder reranking, and a final LLM curator scoring pass over a small candidate pool.  
 
   - **Reasoning & Explanation Agent** — takes the ranked candidates + taste profile and generates grounded “Why you might enjoy it” rationales, streaming them to the UI and writing them to Supabase + Redis as logged signals for reuse, taste profile updates, offline analysis, and model / ranking retraining.
 
@@ -83,36 +83,39 @@ At runtime, Reelix is a **three-agent system** sitting on top of a hybrid retrie
 ```text
 Taste Signals ──▶ Taste Vector ─────────────┐
                                             │
-User Query ───────────────┐                 │
+User Query + context ─────┐                 │
                           ▼                 │
                  Orchestrator Agent ◀───────┘
                           │
                           ▼
-               Retrieval & Ranking Agent
+               Retrieval & Ranking Agent (with curator LLM scoring)
                           │
-                          ├────────────▶ Initial JSON to UI (candidates, metadata)
+                          ├────────────▶ Fast track JSON to UI (candidates, metadata)
                           ▼
              Reasoning & Explanation Agent
                           │
      ┌────────────────────┴────────────────────┐
      ▼                                         ▼
-  SSE "why" to UI                      Logs + Cache (Supabase / Redis)
-                                              │
-                                              ▼
+  SSE "why" to UI                    Logs + Cache (Supabase / Redis)
+                                               │
+                                               ▼
                                    Taste Updates, Analysis, Retraining
 ```
+
 
 ### 1) Orchestrator Agent
 
 **Agentic orchestration layer** — *“What should we do next?”*
 
-- **Understands intent from conversation**  
-  Parses the current query plus recent turns to infer what the user is trying to do:
-  - Explore by Vibe, refresh For-You, refine results, focus on a franchise/actor, adjust filters, etc.
+The orchestrator converts messy natural language into a clean `RecQuerySpec` and keeps it stable across multi-turn refinement. It extracts only what’s clearly implied (precision > recall).
 
-- **Builds a small, explicit plan**  
-  - Derives retrieval needs (dense vs. sparse depth)  
-  - Assembles filters (genres, year range, streaming providers)  
+- **Understands intent from conversation**  
+  - Interprets the current message in the context of recent turns
+  - Decides whether this is a new request, refinement, or a meta/non-rec question
+
+- **Builds a small, explicit plan** (`RecQuerySpec` as a “living object”)
+  - Parse intents into precise query_text, genres, sub-genres, tone, narrative shape
+  - Assembles filters (genres, year range, streaming providers, etc.)  
   - Decides how much personalization to apply (taste vector, recent interactions)
 
 - **Routes to other agents and tools**  
@@ -129,20 +132,25 @@ User Query ───────────────┐                 │
 
 **Hybrid retrieval + multi-stage ranking layer** — *“What are the best candidates?”*
 
+This layer executes the `RecQuerySpec` using a hybrid + multi-stage ranking pipeline, then runs a curator scoring pass to keep results vibe-tight.
+
 - **Hybrid retrieval (RAG-style)**  
   - Calls into Qdrant dense + sparse (BM25) to build a high-quality candidate set:  
     - Dense retrieval over fine-tuned `bge-base-en-v1.5` embeddings  
     - Sparse retrieval via BM25 over normalized text  
     - RRF / weighted fusion to merge dense + sparse signals
 
-- **Metadata-aware reranking**  
+- **Metadata-aware + cross-encoder reranking**  
   - Rating, popularity, recency/freshness  
   - Optional genre / vibe alignment  
   - Diversity / de-dupe to avoid franchise spam and near-duplicates
+  - Runs am optional **cross-encoder reranker** on a small window (e.g. top-30), then fuses CE scores back into the final ranking  
 
-- **Cross-encoder + LLM vibe pass**  
-  - Runs a **cross-encoder reranker** on a small window (e.g. top-30), then fuses CE scores back into the final ranking  
-  - Optionally calls an LLM on a small candidate pool to score how well each title matches the user’s free-form vibe description and feeds that signal back into ranking
+- **LLM curator scoring pass**  
+  - Consumes structured intent: Uses the `RecQuerySpec` extracted by the orchestrator, plus candidate metadata.
+  - Scores every candidate on 4 axes (0–2 integers): genre_fit, tone_fit, structure_fit, theme_fit (strict + conservative scoring).
+  - Outputs strict JSON for downstream tiering + UI:
+    - A single JSON object with exactly opening + evaluation_results for every candidate.
 
 - **Fast path to UI**  
   - Returns a **ranked candidate set with metadata** (titles, posters, scores) immediately so the frontend can render cards and layout **before** why-copy is ready.
