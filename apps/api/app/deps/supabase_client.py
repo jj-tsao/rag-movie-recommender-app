@@ -1,8 +1,9 @@
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, status
-
 from app.deps.deps import SupabaseCreds, get_supabase_creds
+from fastapi import Depends, Header, HTTPException, status
+from reelix_user_context.user_context_repo import SupabaseUserContextRepo
+from reelix_user_context.user_context_service import UserContextService
 
 
 def require_bearer_token(authorization: Optional[str] = Header(None)) -> str:
@@ -26,7 +27,7 @@ def get_supabase_client(
 ):
     """Return a Supabase client authorized as the end user (DB calls go through PostgREST with user JWT)."""
     try:
-        from supabase import create_client, Client  # type: ignore
+        from supabase import Client, create_client  # type: ignore
 
         client: Client = create_client(creds.url, creds.api_key)
 
@@ -70,3 +71,15 @@ def get_current_user_id(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Failed to resolve user: {exc}",
         )
+
+
+def get_user_context_repo(
+    sb=Depends(get_supabase_client),
+) -> SupabaseUserContextRepo:
+    return SupabaseUserContextRepo(client=sb)
+
+
+def get_user_context_service(
+    repo: SupabaseUserContextRepo = Depends(get_user_context_repo),
+) -> UserContextService:
+    return UserContextService(repo=repo)

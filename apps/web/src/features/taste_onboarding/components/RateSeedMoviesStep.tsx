@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { upsertUserInteraction } from "../api";
+import { logUserRecReaction } from "../api";
 import { rebuildTasteProfile } from "@/api";
 import type { PropsWithChildren } from "react";
 import { SEED_MOVIES } from "../data/seed_movies";
@@ -216,9 +216,13 @@ export default function RateSeedMoviesStep({ genres, onBack, onFinish }: Props) 
     const t = upsertTimers.current.get(key);
     if (t) clearTimeout(t);
     if (!m.media_id) return;
+    if (r === "dismiss") {
+      upsertTimers.current.delete(key);
+      return; // We no longer log dismisses during taste onboarding
+    }
     const timer = setTimeout(() => {
-      upsertUserInteraction({ media_id: m.media_id!, title: m.title, vibes: m.vibes, rating: r }).catch((err) => {
-        console.error("upsertUserInteraction failed", err);
+      logUserRecReaction({ mediaId: m.media_id!, title: m.title, reaction: r }).catch((err) => {
+        console.error("Failed to log reaction", err);
       });
       upsertTimers.current.delete(key);
     }, 200);

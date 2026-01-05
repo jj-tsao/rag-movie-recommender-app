@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Any
 
 from pydantic import BaseModel, Field, field_validator
 from reelix_core.types import MediaType, QueryFilter
+from reelix_user.taste.schemas import TasteProfileMeta
+from reelix_watchlist.schemas import WatchStatus, WatchlistKey
+from reelix_user.interactions.schemas import InteractionType
 
 
 class ChatMessage(BaseModel):
@@ -21,7 +24,8 @@ class DiscoverRequest(BaseModel):
     media_type: MediaType = MediaType.MOVIE
     page: int = 1
     page_size: int = 20
-    include_llm_why: bool = False  # if true, returns markdown “why” in JSON
+    query_filters: QueryFilter = Field(default_factory=QueryFilter)
+    include_llm_why: bool = True  # if true, returns markdown “why” in JSON
     session_id: str
     query_id: str
     device_info: DeviceInfo | None = None
@@ -35,7 +39,7 @@ class InteractiveRequest(BaseModel):
             "Mind-bending sci-fi with philosophical undertones and existential stakes"
         ],
     )
-    history: List[ChatMessage] | None = Field(default_factory=list, examples=[[]])
+    # history: List[ChatMessage] | None = Field(default_factory=list, examples=[[]])
     query_filters: QueryFilter = Field(default_factory=QueryFilter)
     session_id: str
     query_id: str
@@ -48,134 +52,84 @@ class InteractiveRequest(BaseModel):
         return v
 
 
+class ExploreRerunPatch(BaseModel):
+    # If field is omitted => keep existing.
+    # If field is present as null => clear.
+    # If field is present as [] or list => replace with exactly that list.
+    providers: list[str] | None = Field(default=None)
+    year_range: tuple[int, int] | None = Field(default=None) 
+
+
+class ExploreRerunRequest(BaseModel):
+    session_id: str
+    query_id: str
+    device_info: dict | None = None
+    patch: ExploreRerunPatch = Field(default_factory=ExploreRerunPatch)
+
+
 class FinalRec(BaseModel):
     media_id: int
     why: str
+    imdb_rating: float | None = None
+    rt_rating: int | None = None
+    why_source: str  # "cache" or "llm"
 
 
 class FinalRecsRequest(BaseModel):
     query_id: str
+    media_type: MediaType
     final_recs: List[FinalRec]
 
 
-# ===== User Taste Profile =====
-
-# class PreferencesUpdate(BaseModel):
-#     genres_include: Optional[List[str]] = None
-#     genres_exclude: Optional[List[str]] = None
-#     keywords_include: Optional[List[str]] = None
-#     keywords_exclude: Optional[List[str]] = None
-#     languages: Optional[List[str]] = None
-#     year_min: Optional[int] = None
-#     year_max: Optional[int] = None
-#     runtime_min: Optional[int] = None
-#     runtime_max: Optional[int] = None
-#     maturity_ratings: Optional[List[str]] = None
-#     include_movies: Optional[bool] = None
-#     include_tv: Optional[bool] = None
-#     prefer_recency: Optional[bool] = None
-#     diversity_level: Optional[int] = Field(
-#         None, description="0=strict,1=balanced,2=explore"
-#     )
-
-#     @model_validator(mode="after")
-#     def validate_ranges(self) -> "PreferencesUpdate":
-#         if self.year_min is not None and self.year_max is not None:
-#             if self.year_min > self.year_max:
-#                 raise ValueError("year_min must be <= year_max")
-#         if self.runtime_min is not None and self.runtime_max is not None:
-#             if self.runtime_min > self.runtime_max:
-#                 raise ValueError("runtime_min must be <= runtime_max")
-#         if self.diversity_level is not None and self.diversity_level not in (0, 1, 2):
-#             raise ValueError("diversity_level must be 0, 1, or 2")
-#         return self
+class TasteProfileExistsOut(TasteProfileMeta):
+    has_profile: bool = True  # route returns 200 only when it exists
 
 
-# class SubscriptionUpsert(BaseModel):
-#     provider_id: str
-#     active: Optional[bool] = True
+class TasteProfileRebuildRequest(BaseModel):
+    media_type: MediaType = MediaType.MOVIE
 
 
-# class SubscriptionsPayload(BaseModel):
-#     subscriptions: List[SubscriptionUpsert]
+class UserPreferencesUpsertRequest(BaseModel):
+    genres_include: list[str] = Field(default_factory=list)
+    keywords_include: list[str] = Field(default_factory=list)
 
 
-# MediaType = Literal["movie", "tv"]
-
-# EventType = Literal[
-#     "view",
-#     "finish",
-#     "like",
-#     "dislike",
-#     "save",
-#     "dismiss",
-#     "search",
-#     "click",
-#     "hover",
-#     "trailer_view",
-#     "provider_open",
-# ]
-
-
-# class InteractionCreate(BaseModel):
-#     media_type: MediaType
-#     tmdb_id: int
-#     event_type: EventType
-#     weight: Optional[float] = 1.0
-#     context_json: Optional[Dict[str, Any]] = None
-#     occurred_at: Optional[str] = None  # allow client-supplied timestamp
+class WatchlistCreateRequest(BaseModel):
+    media_id: int
+    media_type: MediaType = MediaType.MOVIE
+    status: WatchStatus = WatchStatus.WANT
+    title: str | None = None
+    poster_url: str | None = None
+    backdrop_url: str | None = None
+    trailer_url: str | None = None
+    release_year: int | None = None
+    genres: list[str] | None = None
+    imdb_rating: float | None = None
+    rt_rating: int | None = None
+    why_summary: str | None = None
+    source: str | None = None
 
 
-# class InteractionsPayload(BaseModel):
-#     interactions: List[InteractionCreate]
+class KeysLookupRequest(BaseModel):
+    keys: list[WatchlistKey] = Field(..., min_length=1, max_length=200)
 
 
-# # ===== Recommendation Pipeline =====
-
-# class ChatMessage(BaseModel):
-#     role: str
-#     content: str
-
-
-# class MediaType(str, Enum):
-#     MOVIE = "movie"
-#     TV = "tv"
-
-# class DeviceInfo(BaseModel):
-#     device_type: Optional[str] = None
-#     platform: Optional[str] = None
-#     user_agent: Optional[str] = None
+class WatchlistUpdateByIdRequest(BaseModel):
+    status: WatchStatus | None = None
+    rating: int | None = Field(None, ge=1, le=10)
+    notes: str | None = None
 
 
-# class ChatRequest(BaseModel):
-#     question: str
-#     history: List[ChatMessage] = []
-#     media_type: MediaType = MediaType.MOVIE
-#     genres: List[str] = []
-#     providers: List[str] = []
-#     year_range: List[int] = [1970, 2025]
-#     session_id: str
-#     query_id: str
-#     device_info: Optional[DeviceInfo] = None
-
-#     @field_validator("question")
-#     def validate_question(cls, v):
-#         if not v.strip():
-#             raise ValueError("Question cannot be empty")
-#         return v
-
-#     @model_validator(mode="after")
-#     def validate_year_range(self) -> "ChatRequest":
-#         if len(self.year_range) != 2:
-#             raise ValueError("year_range must be a list of exactly two integers: [start, end]")
-#         return self
-
-
-# class FinalRec(BaseModel):
-#     media_id: int
-#     why: str
-
-
-# class FinalRecsRequest(BaseModel):
-#     query_id: str
-#     final_recs: List[FinalRec]
+class InteractionsCreateRequest(BaseModel):
+    media_type: MediaType
+    media_id: int
+    title: str
+    event_type: InteractionType
+    reaction: str | None = None
+    value: float | None = None
+    position: int | None = None
+    source: str | None = None
+    query_id: str | None = None
+    session_id: str | None = None
+    context_json: dict[str, Any] | None = None
+    idempotency_key: str | None = None

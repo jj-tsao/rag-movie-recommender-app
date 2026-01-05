@@ -11,11 +11,15 @@ export interface DiscoverInitialItem {
   trailer_key?: string | null;
   genres?: string[];
   providers?: string[];
+  why_md?: string | null;
+  imdb_rating?: number | string | null;
+  rotten_tomatoes_rating?: number | string | null;
+  why_source?: "cache" | "llm";
 }
 
 export interface DiscoverInitialResponse {
   query_id: string;
-  stream_url?: string;
+  stream_url?: string | null;
   items: DiscoverInitialItem[];
 }
 
@@ -26,6 +30,8 @@ export interface DiscoverRequestOptions {
   includeWhy?: boolean;
   sessionId: string;
   queryId: string;
+  providerIds?: number[];
+  genres?: string[];
 }
 
 export type DiscoverStreamEvent =
@@ -49,8 +55,25 @@ export async function getAccessToken(): Promise<string | null> {
 
 export async function fetchDiscoverInitial(
   token: string,
-  { mediaType = "movie", page = 1, pageSize = 12, includeWhy = false, sessionId, queryId }: DiscoverRequestOptions,
+  {
+    mediaType = "movie",
+    page = 1,
+    pageSize = 12,
+    includeWhy = false,
+    sessionId,
+    queryId,
+    providerIds,
+    genres,
+  }: DiscoverRequestOptions,
 ): Promise<DiscoverInitialResponse> {
+  const queryFilters: { providers?: number[]; genres?: string[] } = {};
+  if (providerIds && providerIds.length > 0) {
+    queryFilters.providers = providerIds;
+  }
+  if (genres && genres.length > 0) {
+    queryFilters.genres = genres;
+  }
+
   const response = await fetch(`${BASE_URL}/discovery/for-you`, {
     method: "POST",
     headers: {
@@ -64,6 +87,7 @@ export async function fetchDiscoverInitial(
       include_llm_why: includeWhy,
       session_id: sessionId,
       query_id: queryId,
+      query_filters: queryFilters,
     }),
   });
 
@@ -137,6 +161,40 @@ export async function streamDiscoverWhy({
     if (parsed) {
       onEvent(parsed);
     }
+  }
+}
+
+export async function logDiscoverFinalRecs({
+  queryId,
+  mediaType,
+  finalRecs,
+}: {
+  queryId: string;
+  mediaType: "movie" | "tv";
+  finalRecs: {
+    media_id: number;
+    why: string;
+    imdb_rating?: number | null;
+    rt_rating?: number | null;
+    why_source: "cache" | "llm";
+  }[];
+}): Promise<void> {
+  const token = await getSupabaseAccessToken();
+  const response = await fetch(`${BASE_URL}/discovery/log/final_recs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      query_id: queryId,
+      media_type: mediaType,
+      final_recs: finalRecs,
+    }),
+  });
+
+  if (!response.ok) {
+    console.warn("Failed to log discovery final recs");
   }
 }
 
@@ -243,7 +301,7 @@ function toMediaId(value: unknown): string | null {
   return null;
 }
 
-function normalizeTomatoScore(value: unknown): number | null {
+export function normalizeTomatoScore(value: unknown): number | null {
   let parsed: number | null = null;
 
   if (typeof value === "string") {

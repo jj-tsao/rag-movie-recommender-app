@@ -4,9 +4,12 @@ import httpx
 from contextlib import asynccontextmanager
 
 from dotenv import find_dotenv, load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
+from postgrest.exceptions import APIError as PgRestError
+from reelix_core.errors import DomainError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from qdrant_client import QdrantClient
 
@@ -15,25 +18,36 @@ from reelix_core.config import (
     QDRANT_MOVIE_COLLECTION_NAME,
     QDRANT_TV_COLLECTION_NAME,
 )
-from reelix_logging.logger import TelemetryLogger
-from app.infrastructure.cache.ticket_store import make_ticket_store
+from reelix_logging.rec_logger import TelemetryLogger
+from app.infrastructure.cache.redis_infra import make_redis_clients
+from app.infrastructure.cache.ticket_store import TicketStore
+from app.infrastructure.cache.state_store import StateStore
+from app.infrastructure.cache.why_cache import WhyCache
 from .routers import all_routers
 
 
 class Settings(BaseSettings):
     app_name: str = "Reelix Discovery Agent API"
+
     # credentials
     qdrant_endpoint: str | None = None
     qdrant_api_key: str | None = None
     supabase_url: str | None = None
     supabase_api_key: str | None = None
     openai_api_key: str | None = None
-    # ticket_store config
-    use_redis_ticket_store: bool = False
     redis_url: str | None = None
-    ticket_namespace: str = "disc:ticket:"
-    ticket_ttl_abs: int = 3600  # 60 min absolute cap
-    # env conifg
+
+    # ticket_store config
+    ticket_namespace: str = "reelix:ticket:"
+    why_cache_namespace: str = "reelix:why:"
+    session_namespace: str = "reelix:agent:session:"
+    ticket_ttl_sec: int = 3600  # 60 min cap
+    session_ttl_sec: int = 7 * 24 * 3600  # 7d cap
+    why_cache_ttl_sec: int = 14 * 24 * 3600  # 2 weeks cap
+    ticket_ttl_sec: int = 3600  # 60 min absolute cap
+    why_cache_ttl_sec: int = 7 * 24 * 3600
+
+    # env config
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
@@ -47,13 +61,12 @@ def _init_recommendation_stack(app: FastAPI) -> None:
 
     from reelix_models.custom_models import (
         load_bm25_files,
-        load_cross_encoder,
         load_sentence_model,
-        setup_intent_classifier,
     )
-    from reelix_recommendation.recommend import RecommendPipeline
     from reelix_retrieval.base_retriever import BaseRetriever
+    from reelix_recommendation.recommend import RecommendPipeline
     from reelix_retrieval.query_encoder import Encoder
+    from reelix_agent.orchestrator.agent_rec_runner import AgentRecRunner
     from reelix_recommendation.recipes import InteractiveRecipe, ForYouFeedRecipe
     from openai import OpenAI
     from reelix_models.llm_completion import OpenAIChatLLM
@@ -61,28 +74,31 @@ def _init_recommendation_stack(app: FastAPI) -> None:
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     startup_t0 = time.perf_counter()
 
+    # == Verify required credits ==
     required = {
         "QDRANT_ENDPOINT": app.state.settings.qdrant_endpoint,
         "QDRANT_API_KEY": app.state.settings.qdrant_api_key,
+        "SUPABASE_URL": app.state.settings.supabase_url,
+        "SUPABASE_API_KEY": app.state.settings.supabase_api_key,
         "OPENAI_API_KEY": app.state.settings.openai_api_key,
+        "REDIS_URL": app.state.settings.redis_url,
     }
     missing = [
         name for name, value in required.items() if not (value and value.strip())
     ]
     if missing:
         raise RuntimeError(
-            "Missing API keys in environment: " + ", ".join(sorted(missing))
+            "Missing credentials in environment: " + ", ".join(sorted(missing))
         )
 
+    # == Initialize recommendation stacks ==
     nltk_data_path = str(NLTK_PATH)
     if nltk_data_path not in nltk.data.path:
         nltk.data.path.append(nltk_data_path)
 
-    intent_classifier = setup_intent_classifier()
     embed_model = load_sentence_model()
     bm25_models, bm25_vocabs = load_bm25_files()
     query_encoder = Encoder(embed_model, bm25_models, bm25_vocabs)
-    cross_encoder = load_cross_encoder()
     openai_client = OpenAI(api_key=app.state.settings.openai_api_key)
     chat_completion_llm = OpenAIChatLLM(
         openai_client, request_timeout=60.0, max_retries=2
@@ -100,32 +116,39 @@ def _init_recommendation_stack(app: FastAPI) -> None:
         dense_vector_name="dense_vector",
         sparse_vector_name="sparse_vector",
     )
-    pipeline = RecommendPipeline(base_retriever, ce_model=cross_encoder, rrf_k=60)
+    pipeline = RecommendPipeline(base_retriever, rrf_k=60)
 
-    app.state.intent_classifier = intent_classifier
-    app.state.embed_model = embed_model
-    app.state.bm25_models = bm25_models
-    app.state.bm25_vocabs = bm25_vocabs
     app.state.query_encoder = query_encoder
-    app.state.cross_encoder = cross_encoder
     app.state.recommend_pipeline = pipeline
+    app.state.agent_rec_runner = AgentRecRunner(
+        pipeline=pipeline,
+        query_encoder=query_encoder,
+    )
     app.state.recipes = {
         "for_you_feed": ForYouFeedRecipe(query_encoder=app.state.query_encoder),
         "interactive": InteractiveRecipe(query_encoder=app.state.query_encoder),
     }
     app.state.chat_completion_llm = chat_completion_llm
 
-    # create the ticket store
-    # use_redis_env = os.getenv("USE_REDIS_TICKET_STORE", "").lower() in {"1", "true", "yes"}
-    # redis_url = os.getenv("REDIS_URL") or (app.state.settings.redis_url or "")
+    # == Initialize Redis stores ==
+    redis_clients = make_redis_clients(app.state.settings.redis_url)
 
-    app.state.ticket_store = make_ticket_store(
-        use_redis=app.state.settings.use_redis_ticket_store,
-        redis_url=app.state.settings.redis_url,
+    app.state.ticket_store = TicketStore(
+        client=redis_clients.bytes,
         namespace=app.state.settings.ticket_namespace,
-        absolute_ttl_sec=app.state.settings.ticket_ttl_abs,
-        # Optional redis client kwargs for timeouts:
-        # client_kwargs={"socket_connect_timeout": 2, "socket_timeout": 3} if use_redis else None,
+        absolute_ttl_sec=app.state.settings.ticket_ttl_sec,
+    )
+
+    app.state.state_store = StateStore(
+        client=redis_clients.bytes,
+        namespace=app.state.settings.session_namespace,
+        absolute_ttl_sec=app.state.settings.session_ttl_sec,
+    )
+
+    app.state.why_cache = WhyCache(
+        client=redis_clients.text,
+        namespace=app.state.settings.why_cache_namespace,
+        absolute_ttl_sec=app.state.settings.why_cache_ttl_sec,
     )
 
     print(f"🔧 Total startup time: {time.perf_counter() - startup_t0:.2f}s")
@@ -137,24 +160,24 @@ async def lifespan(app: FastAPI):
 
     settings = Settings()
     app.state.settings = settings
-    
+
     supabase_url = app.state.settings.supabase_url
     supabase_api_key = app.state.settings.supabase_api_key
-    
+
     if not supabase_url or not supabase_api_key:
         raise RuntimeError("Missing Supabase credits")
-    
+
     http_client = httpx.AsyncClient(timeout=5.0)
-    
+
     logger = TelemetryLogger(
         supabase_url,
         supabase_api_key,
         client=http_client,
-        timeout_s=5.0, 
+        timeout_s=5.0,
     )
-    
+
     app.state.logger = logger
-    
+
     # Eager init of external clients/models
     if _should_init_recommendation():
         try:
@@ -174,12 +197,14 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await http_client.aclose()
+        await app.state.why_cache.aclose()
+
 
 app = FastAPI(title="Reelix Discovery Agent API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://reelixai.netlify.app", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -209,6 +234,24 @@ def _custom_openapi():
 
 
 app.openapi = _custom_openapi
+
+
+@app.exception_handler(DomainError)
+async def domain_error_handler(request: Request, exc: DomainError):
+    return JSONResponse(
+        status_code=exc.status,
+        content={"error": {"code": exc.code, "message": str(exc)}},
+    )
+
+
+@app.exception_handler(PgRestError)
+async def postgrest_error_handler(request: Request, exc: PgRestError):
+    # Fallback if any PgRestError leaks past the repo mapping
+    status = 400 if getattr(exc, "code", "") in ("22P02", "23502") else 500
+    return JSONResponse(
+        status_code=status,
+        content={"error": {"code": "db_error", "message": "database error"}},
+    )
 
 
 @app.get("/health")

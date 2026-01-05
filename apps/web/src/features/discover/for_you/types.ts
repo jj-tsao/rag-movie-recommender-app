@@ -12,6 +12,7 @@ export interface DiscoverCardData {
   rottenTomatoesRating?: number | null;
   whyMarkdown?: string;
   whyText?: string;
+  whySource?: "cache" | "llm";
   isWhyLoading: boolean;
   isRatingsLoading: boolean;
 }

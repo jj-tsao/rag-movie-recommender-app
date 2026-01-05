@@ -1,14 +1,15 @@
 from dataclasses import dataclass
-from typing import Any, Callable, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from fastapi import HTTPException, Request, status
 from qdrant_client import QdrantClient
+from reelix_agent.orchestrator.agent_rec_runner import AgentRecRunner
 
 if TYPE_CHECKING:
+    from reelix_logging.rec_logger import TelemetryLogger
+    from reelix_models.llm_completion import OpenAIChatLLM
     from reelix_recommendation.recommend import RecommendPipeline
     from reelix_retrieval.query_encoder import Encoder
-    from reelix_models.llm_completion import OpenAIChatLLM
-    from reelix_logging.logger import TelemetryLogger
 else:
     RecommendPipeline = Any  # type: ignore
     Encoder = Any  # type: ignore
@@ -61,6 +62,17 @@ def get_recommend_pipeline(request: Request) -> "RecommendPipeline":
     )
 
 
+def get_agent_rec_runner(request: Request) -> "AgentRecRunner":
+    return cast(
+        "AgentRecRunner",
+        _get_state_attr(
+            request,
+            "agent_rec_runner",
+            "agent recommendation runner not initialized",
+        ),
+    )
+
+
 class RecipeRegistry:
     def __init__(self, data: dict):
         self._data = data
@@ -95,6 +107,7 @@ def get_interactive_stream_fn(request: Request) -> Callable:
         )
     return fn
 
+
 @dataclass(frozen=True)
 class SupabaseCreds:
     url: str
@@ -107,6 +120,7 @@ def get_supabase_creds(request: Request) -> SupabaseCreds:
         url=settings.supabase_url,
         api_key=settings.supabase_api_key,
     )
+
 
 def get_logger(request: Request) -> TelemetryLogger:
     return cast(

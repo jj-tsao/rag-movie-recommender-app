@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Session, User, AuthChangeEvent } from "@supabase/supabase-js";
+import type { TablesInsert } from "@/types/supabase";
 import { getAppUser, getCurrentSession, onAuthStateChange, upsertAppUser } from "../api";
 
 type AuthState = {
@@ -34,6 +35,37 @@ export function useAuth() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!state.user || state.loading) return;
+      try {
+        const existing = await getAppUser(state.user.id);
+        if (cancelled) return;
+        if (!existing) {
+          const cleanEmail =
+            typeof state.user.email === "string" && state.user.email.trim().length > 0
+              ? state.user.email.trim()
+              : null;
+          const payload: TablesInsert<"app_user"> = {
+            user_id: state.user.id,
+            email: (cleanEmail ?? null) as unknown as string,
+          };
+          const displayName = state.user.user_metadata?.display_name;
+          if (typeof displayName === "string" && displayName.trim().length > 0) {
+            payload.display_name = displayName.trim();
+          }
+          await upsertAppUser(payload);
+        }
+      } catch (error) {
+        console.warn("Failed to ensure app_user profile", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.user?.id, state.user?.email, state.user?.user_metadata, state.loading]);
+
   // On first authenticated load, if we have a pending display name from sign up,
   // upsert the app_user profile and clear the pending value.
   useEffect(() => {
@@ -44,9 +76,13 @@ export function useAuth() {
         if (!pending) return;
         const existing = await getAppUser(state.user.id);
         if (!existing || !existing.display_name) {
+          const cleanEmail =
+            typeof state.user.email === "string" && state.user.email.trim().length > 0
+              ? state.user.email.trim()
+              : null;
           await upsertAppUser({
             user_id: state.user.id,
-            email: state.user.email || "",
+            email: (cleanEmail ?? null) as unknown as string,
             display_name: pending,
           });
         }

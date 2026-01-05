@@ -2,7 +2,6 @@ import type { InteractiveRequestPayload } from "./types/types";
 import { getSupabaseAccessToken } from "./lib/session";
 
 export const BASE_URL = import.meta.env.VITE_BACKEND_URL;
-// export const BASE_URL = "http://127.0.0.1:8000";
 
 export async function streamChatResponse(
   request: InteractiveRequestPayload,
@@ -17,7 +16,7 @@ export async function streamChatResponse(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${BASE_URL}/recommend/interactive`, {
+  const response = await fetch(`${BASE_URL}/recommendations/interactive`, {
     method: "POST",
     headers,
     body: JSON.stringify(request),
@@ -38,7 +37,6 @@ export async function streamChatResponse(
   }
 }
 
-
 export async function logFinalRecs({
   queryId,
   finalRecs,
@@ -47,7 +45,7 @@ export async function logFinalRecs({
   finalRecs: { media_id: number; why: string }[];
 }) {
   const token = await getSupabaseAccessToken();
-  const res = await fetch(`${BASE_URL}/recommend/log/final_recs`, {
+  const res = await fetch(`${BASE_URL}/recommendations/log/final_recs`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -70,7 +68,7 @@ export async function rebuildTasteProfile(): Promise<void> {
     throw new Error("Not signed in");
   }
 
-  const res = await fetch(`${BASE_URL}/taste_profile/rebuild`, {
+  const res = await fetch(`${BASE_URL}/v2/users/me/taste_profile/rebuild`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

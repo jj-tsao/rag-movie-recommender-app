@@ -16,7 +16,7 @@ export default function TasteOnboardingPage() {
   const navigate = useNavigate();
 
   function goToDiscover(firstRun = false) {
-    navigate(firstRun ? "/discover?first_run=1" : "/discover");
+    navigate(firstRun ? "/discover/for-you?first_run=1" : "/discover/for-you");
   }
 
   async function handleGenresSubmit({
@@ -36,9 +36,8 @@ export default function TasteOnboardingPage() {
     try {
       setSubmitting(true);
       await upsertUserPreferences({
-        user_id: user.id,
-        genres_include: genres,
-        keywords_include: vibeTags,
+        genres,
+        keywords: vibeTags,
       });
       toast({
         title: "Saved",

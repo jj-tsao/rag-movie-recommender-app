@@ -1,28 +1,61 @@
+import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import clsx from "clsx";
-import { Heart, ThumbsDown, ThumbsUp } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Heart,
+  Plus,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  X,
+} from "lucide-react";
 import type { ParsedMovie } from "../utils/parseMarkdown";
 import { hasAnyRating, hasValidScore } from "@/utils/checkScores";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import type { WatchlistStatus } from "@/features/watchlist/api";
 
 type MovieCardExtras = {
   releaseYear?: number;
   providers?: string[];
   whyMarkdown?: string;
   whyText?: string;
+  whySource?: "cache" | "llm";
   isWhyLoading?: boolean;
   isRatingsLoading?: boolean;
   layout?: "grid" | "wide";
 };
 
-type MovieCardInput = Partial<ParsedMovie> & MovieCardExtras & {
-  title: string;
-  imdbRating?: number | string | null;
-  rottenTomatoesRating?: number | string | null;
-  posterUrl?: string;
-  backdropUrl?: string;
-};
+type MovieCardInput = Omit<Partial<ParsedMovie>, "mediaId" | "imdbRating" | "rottenTomatoesRating"> &
+  MovieCardExtras & {
+    mediaId?: string | number;
+    title: string;
+    imdbRating?: number | string | null;
+    rottenTomatoesRating?: number | string | null;
+    posterUrl?: string;
+    backdropUrl?: string;
+  };
+
+type WatchlistButtonState = "loading" | "not_added" | "in_list";
+
+interface WatchlistControlProps {
+  state: WatchlistButtonState;
+  status?: WatchlistStatus | null;
+  rating?: number | null;
+  busy?: boolean;
+  onAdd: () => void;
+  onSelectStatus: (status: WatchlistStatus) => void;
+  onRemove: () => void;
+  showRatingPrompt?: boolean;
+  onRatingSelect?: (value: number) => void;
+  onRatingSkip?: () => void;
+  onRatingPromptOpen?: () => void;
+  onRatingClear?: () => void;
+  onOverlayChange?: (active: boolean) => void;
+}
 
 interface Props {
   movie: MovieCardInput;
@@ -32,10 +65,17 @@ interface Props {
     disabled?: boolean;
     onChange: (value: "love" | "like" | "dislike") => void;
   };
+  watchlist?: WatchlistControlProps;
   onTrailerClick?: () => void;
 }
 
-export default function MovieCard({ movie, layout = "grid", feedback, onTrailerClick }: Props) {
+export default function MovieCard({
+  movie,
+  layout = "grid",
+  feedback,
+  watchlist,
+  onTrailerClick,
+}: Props) {
   const posterUrl = movie.posterUrl ?? undefined;
   const backdropUrl = movie.backdropUrl ?? undefined;
   const providers = movie.providers ?? [];
@@ -44,42 +84,55 @@ export default function MovieCard({ movie, layout = "grid", feedback, onTrailerC
   const rtRaw = movie.rottenTomatoesRating ?? undefined;
   const isWhyLoading = movie.isWhyLoading ?? false;
   const isRatingsLoading = movie.isRatingsLoading ?? false;
-  const hasRating = !isRatingsLoading && hasAnyRating({ imdbRating: imdbRaw, rottenTomatoesRating: rtRaw });
+  const hasRating =
+    !isRatingsLoading &&
+    hasAnyRating({ imdbRating: imdbRaw, rottenTomatoesRating: rtRaw });
   const whySource = movie.whyMarkdown ?? movie.whyText ?? movie.why ?? "";
-  const hasWhyContent = !isWhyLoading && typeof whySource === "string" && whySource.trim().length > 0;
+  const hasWhyContent =
+    !isWhyLoading &&
+    typeof whySource === "string" &&
+    whySource.trim().length > 0;
   const isWide = layout === "wide";
 
   const containerClass = clsx(
-    "group relative flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-background/95 text-white transition-all duration-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] hover:scale-[1.01]",
-    isWide ? "md:hover:-translate-y-0.5" : "hover:-translate-y-1",
+    "group relative flex h-full flex-col overflow-visible rounded-xl border border-white/10 bg-background/95 text-white transition-all duration-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] hover:scale-[1.01]",
+    isWide ? "md:hover:-translate-y-0.5" : "hover:-translate-y-1"
   );
 
   const contentClass = clsx(
     "relative z-10 flex flex-col gap-4 p-4 md:flex-row",
-    isWide && "gap-6 p-6",
+    isWide && "gap-6 p-6"
   );
 
   const posterWrapperClass = clsx(
     "mx-auto flex w-full max-w-[11rem] flex-shrink-0 overflow-hidden rounded-lg bg-black/30 md:mx-0 md:w-44",
-    isWide && "max-w-[12rem] md:w-48",
+    isWide && "max-w-[12rem] md:w-48"
   );
 
   const titleClass = "text-2xl font-semibold leading-tight text-white";
   const metaClass = "text-sm text-zinc-300";
   const bulletClass = "text-zinc-500";
-  const ratingContainerClass = "flex flex-wrap items-center gap-2 text-sm text-zinc-300";
-  const whyHeaderClass = "text-xs font-semibold uppercase tracking-wide text-zinc-400";
+  const ratingContainerClass =
+    "flex flex-wrap items-center gap-2 text-sm text-zinc-300";
+  const whyHeaderClass =
+    "text-xs font-semibold uppercase tracking-wide text-zinc-400";
   const emptyWhyClass = "text-sm italic text-zinc-400";
-  const providerBadgeClass = "rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-zinc-100 backdrop-blur";
+  const providerBadgeClass =
+    "rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-zinc-100 backdrop-blur";
   const feedbackValue = feedback?.value;
   const feedbackDisabled = feedback?.disabled ?? false;
-  const feedbackLabelClass = "text-xs font-semibold uppercase tracking-wide text-zinc-400";
+  const feedbackLabelClass =
+    "text-xs font-semibold uppercase tracking-wide text-zinc-400";
+  const [overlayActive, setOverlayActive] = useState(false);
 
   return (
-    <Card className={containerClass}>
+    <Card
+      className={containerClass}
+      style={overlayActive ? { position: "relative", zIndex: 30 } : undefined}
+    >
       {backdropUrl ? (
-        <div className="pointer-events-none absolute inset-0 z-0">
-          {/* Backdrop image with consistent opacity across /query and /discover */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-xl">
+          {/* Backdrop image with consistent opacity across /query and /discover/for-you */}
           <div
             className="h-full w-full bg-cover bg-center blur-[1px] opacity-15 transition-opacity duration-300 group-hover:opacity-20"
             style={{ backgroundImage: `url(${backdropUrl})` }}
@@ -118,10 +171,7 @@ export default function MovieCard({ movie, layout = "grid", feedback, onTrailerC
             {providers.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {providers.map((provider) => (
-                  <span
-                    key={provider}
-                    className={providerBadgeClass}
-                  >
+                  <span key={provider} className={providerBadgeClass}>
                     {provider}
                   </span>
                 ))}
@@ -130,7 +180,8 @@ export default function MovieCard({ movie, layout = "grid", feedback, onTrailerC
 
             {genres.length > 0 ? (
               <div className={metaClass}>
-                <span className="font-medium text-white">Genres:</span> {genres.join(", ")}
+                <span className="font-medium text-white">Genres:</span>{" "}
+                {genres.join(", ")}
               </div>
             ) : null}
 
@@ -142,14 +193,20 @@ export default function MovieCard({ movie, layout = "grid", feedback, onTrailerC
                 </div>
               ) : hasRating ? (
                 <p className={ratingContainerClass}>
-                  {hasValidScore(imdbRaw) ? <span>⭐ {formatRating(imdbRaw)}/10</span> : null}
+                  {hasValidScore(imdbRaw) ? (
+                    <span>⭐ {formatRating(imdbRaw)}/10</span>
+                  ) : null}
                   {hasValidScore(imdbRaw) && hasValidScore(rtRaw) ? (
                     <span className={bulletClass}>•</span>
                   ) : null}
-                  {hasValidScore(rtRaw) ? <span>🍅 {formatRating(rtRaw)}%</span> : null}
+                  {hasValidScore(rtRaw) ? (
+                    <span>🍅 {formatRating(rtRaw)}%</span>
+                  ) : null}
                 </p>
               ) : (
-                <span className="text-sm italic text-zinc-400">Ratings pending</span>
+                <span className="text-sm italic text-zinc-400">
+                  Ratings pending
+                </span>
               )}
             </div>
           </div>
@@ -167,22 +224,36 @@ export default function MovieCard({ movie, layout = "grid", feedback, onTrailerC
                 <ReactMarkdown>{whySource}</ReactMarkdown>
               </div>
             ) : (
-              <p className={emptyWhyClass}>We're still working on a personalized reason for this pick.</p>
+              <p className={emptyWhyClass}>
+                We're still working on a personalized reason for this pick.
+              </p>
             )}
           </div>
 
-          {movie.trailerKey ? (
-            <div>
-              <a
-                href={`https://www.youtube.com/watch?v=${movie.trailerKey}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => onTrailerClick?.()}
-                className="inline-flex items-center gap-2 text-base font-medium text-blue-300 hover:underline"
-              >
-                <img src="/icons/play_icon.png" alt="Play" className="h-5 w-5" />
-                Watch trailer
-              </a>
+          {movie.trailerKey || watchlist ? (
+            <div className="flex flex-wrap items-center gap-4">
+              {movie.trailerKey ? (
+                <a
+                  href={`https://www.youtube.com/watch?v=${movie.trailerKey}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => onTrailerClick?.()}
+                  className="inline-flex items-center gap-2 text-base font-medium text-blue-300 hover:underline"
+                >
+                  <img
+                    src="/icons/play_icon.png"
+                    alt="Play"
+                    className="h-5 w-5"
+                  />
+                  Watch trailer
+                </a>
+              ) : null}
+              {watchlist ? (
+                <WatchlistButton
+                  {...watchlist}
+                  onOverlayChange={setOverlayActive}
+                />
+              ) : null}
             </div>
           ) : null}
 
@@ -223,6 +294,412 @@ export default function MovieCard({ movie, layout = "grid", feedback, onTrailerC
   );
 }
 
+function WatchlistButton({
+  state,
+  status,
+  rating,
+  busy = false,
+  onAdd,
+  onSelectStatus,
+  onRemove,
+  showRatingPrompt = false,
+  onRatingSelect,
+  onRatingSkip,
+  onRatingPromptOpen,
+  onRatingClear,
+  onOverlayChange,
+}: WatchlistControlProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (event: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (state !== "in_list") {
+      setOpen(false);
+    }
+  }, [state]);
+
+  const shouldShowPrompt = Boolean(
+    state === "in_list" && showRatingPrompt && onRatingSelect && onRatingSkip && !busy,
+  );
+
+  const isOverlayActive = open || shouldShowPrompt;
+
+  useEffect(() => {
+    onOverlayChange?.(isOverlayActive);
+  }, [isOverlayActive, onOverlayChange]);
+
+  useEffect(() => {
+    if (!shouldShowPrompt) return;
+    const handleClick = (event: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(event.target as Node)) {
+        onRatingSkip?.();
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onRatingSkip?.();
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [shouldShowPrompt, onRatingSkip]);
+
+  const baseButtonClasses = "min-w-[12rem] justify-center";
+
+  if (state === "loading") {
+    return (
+      <Button type="button" disabled className={clsx("gap-2", baseButtonClasses)}>
+        Checking…
+      </Button>
+    );
+  }
+
+  if (state === "not_added") {
+    return (
+      <Button
+        type="button"
+        onClick={onAdd}
+        disabled={busy}
+        aria-live="polite"
+        className={clsx("gap-2 text-white", "bg-[#2563EB] hover:bg-[#1D4ED8]", baseButtonClasses)}
+      >
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        Add to Watchlist
+      </Button>
+    );
+  }
+
+  const effectiveStatus: WatchlistStatus = status === "watched" ? "watched" : "want";
+  const isWatched = effectiveStatus === "watched";
+  const label = isWatched ? "Watched" : "In Watchlist";
+
+  const buttonClass = isWatched
+    ? "bg-[#16A34A] hover:bg-[#15803D] text-white"
+    : "bg-[#064E3B] hover:bg-[#065F46] text-[#A7F3D0] border border-[#065F46]";
+
+  return (
+    <div
+      className={clsx(
+        "relative flex flex-wrap items-center gap-2",
+        isOverlayActive ? "z-40" : "z-0",
+      )}
+      style={{ isolation: "isolate" }}
+    >
+      <div className="relative inline-flex" ref={containerRef}>
+        <Button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          disabled={busy}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className={clsx("gap-2 pr-3", buttonClass, baseButtonClasses)}
+        >
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {label}
+          <ChevronDown
+            className={clsx("h-4 w-4 transition-transform", open && "-rotate-180")}
+            aria-hidden="true"
+          />
+          <span className="sr-only">Manage watchlist</span>
+        </Button>
+        {shouldShowPrompt ? (
+          <>
+            <RatingPrompt
+              variant="popover"
+              onSelect={(value) => onRatingSelect?.(value)}
+              onSkip={() => onRatingSkip?.()}
+              onClear={typeof rating === "number" ? onRatingClear : undefined}
+              hasRating={typeof rating === "number"}
+              initialRating={typeof rating === "number" ? rating : null}
+            />
+            <RatingPrompt
+              variant="sheet"
+              onSelect={(value) => onRatingSelect?.(value)}
+              onSkip={() => onRatingSkip?.()}
+              onClear={typeof rating === "number" ? onRatingClear : undefined}
+              hasRating={typeof rating === "number"}
+              initialRating={typeof rating === "number" ? rating : null}
+            />
+          </>
+        ) : null}
+        {open ? (
+          <div
+            role="menu"
+            className="absolute right-0 top-full z-40 mt-2 w-48 rounded-md border border-white/10 bg-background/95 p-1 text-sm shadow-lg backdrop-blur"
+          >
+            <WatchlistMenuButton
+              role="menuitemradio"
+              active={effectiveStatus === "want"}
+              ariaChecked={effectiveStatus === "want"}
+              disabled={busy}
+              onClick={() => {
+                if (effectiveStatus !== "want") {
+                  onSelectStatus("want");
+                }
+                setOpen(false);
+              }}
+            >
+              <Check
+                className={clsx(
+                  "h-4 w-4 transition-opacity",
+                  effectiveStatus === "want" ? "opacity-100" : "opacity-0",
+                )}
+                aria-hidden="true"
+              />
+              <span>Want to watch</span>
+            </WatchlistMenuButton>
+            <WatchlistMenuButton
+              role="menuitemradio"
+              active={effectiveStatus === "watched"}
+              ariaChecked={effectiveStatus === "watched"}
+              disabled={busy}
+              onClick={() => {
+                if (effectiveStatus !== "watched") {
+                  onSelectStatus("watched");
+                }
+                setOpen(false);
+              }}
+            >
+              <Check
+                className={clsx(
+                  "h-4 w-4 transition-opacity",
+                  effectiveStatus === "watched" ? "opacity-100" : "opacity-0",
+                )}
+                aria-hidden="true"
+              />
+              <span>Watched</span>
+            </WatchlistMenuButton>
+            <div className="my-1 h-px bg-white/10" role="none" />
+            <WatchlistMenuButton
+              variant="danger"
+              disabled={busy}
+              onClick={() => {
+                onRemove();
+                setOpen(false);
+              }}
+            >
+              <span>Remove</span>
+            </WatchlistMenuButton>
+          </div>
+        ) : null}
+      </div>
+      {state === "in_list" && onRatingPromptOpen && (effectiveStatus === "watched" || typeof rating === "number") ? (
+        <RatingPill
+          rating={typeof rating === "number" ? rating : null}
+          disabled={busy}
+          onClick={() => {
+            if (!busy) {
+              onRatingPromptOpen();
+            }
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function WatchlistMenuButton({
+  children,
+  active = false,
+  disabled = false,
+  onClick,
+  variant = "default",
+  role = "menuitem",
+  ariaChecked,
+}: {
+  children: ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  variant?: "default" | "danger";
+  role?: "menuitem" | "menuitemradio";
+  ariaChecked?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      role={role}
+      aria-checked={
+        role === "menuitemradio" ? (ariaChecked ?? active) : undefined
+      }
+      className={clsx(
+        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+        active && "bg-white/15 text-white font-medium",
+        variant === "danger" &&
+          "text-rose-300 hover:bg-rose-500/20 focus-visible:ring-rose-400/40",
+        disabled &&
+          "cursor-not-allowed opacity-60 hover:bg-transparent focus-visible:ring-0"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function RatingPrompt({
+  variant,
+  onSelect,
+  onSkip,
+  onClear,
+  hasRating = false,
+  initialRating = null,
+}: {
+  variant: "popover" | "sheet";
+  onSelect: (value: number) => void;
+  onSkip: () => void;
+  onClear?: () => void;
+  hasRating?: boolean;
+  initialRating?: number | null;
+}) {
+  const baseClass =
+    variant === "popover"
+      ? "absolute left-1/2 top-[calc(100%+0.75rem)] z-30 hidden min-w-[22.5rem] -translate-x-1/2 transform rounded-lg border border-white/10 bg-slate-900/95 p-4 text-white shadow-xl backdrop-blur md:block"
+      : "fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md rounded-t-2xl border border-white/10 bg-slate-900/95 px-6 py-5 text-white shadow-[0_-12px_30px_rgba(0,0,0,0.35)] md:hidden";
+
+  const ratingOptions = Array.from({ length: 10 }, (_, index) => index + 1);
+  const [hoverValue, setHoverValue] = useState<number | null>(null);
+  const [focusValue, setFocusValue] = useState<number | null>(null);
+  const baseValue = typeof initialRating === "number" ? initialRating : null;
+  const highlighted = hoverValue ?? focusValue ?? baseValue;
+
+  useEffect(() => {
+    setHoverValue(null);
+    setFocusValue(null);
+  }, [initialRating, variant]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal={variant === "sheet" ? true : undefined}
+      aria-label="Rate this title"
+      className={baseClass}
+    >
+      <button
+        type="button"
+        onClick={onSkip}
+        className="absolute right-3 top-3 rounded-full p-2 text-white/70 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        aria-label="Cancel"
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <div className="flex flex-col items-center gap-3">
+        <p className="text-sm font-medium text-white">Rate this title?</p>
+        <div
+          className="flex items-center justify-center gap-1"
+          role="group"
+          aria-label="Select a star rating"
+          onMouseLeave={() => setHoverValue(null)}
+        >
+          {ratingOptions.map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onSelect(value)}
+              title={`${value} out of 10`}
+              onMouseEnter={() => setHoverValue(value)}
+              onFocus={() => setFocusValue(value)}
+              onBlur={() => setFocusValue((current) => (current === value ? null : current))}
+              className="flex h-8 w-8 items-center justify-center rounded-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/50"
+            >
+              <Star
+                className={clsx(
+                  "h-5 w-5 transition-colors",
+                  highlighted !== null && value <= highlighted
+                    ? "text-[#2563EB]"
+                    : "text-white/35",
+                )}
+                strokeWidth={1.4}
+                fill={highlighted !== null && value <= highlighted ? "currentColor" : "none"}
+              />
+              <span className="sr-only">{`Rate ${value} out of 10`}</span>
+            </button>
+          ))}
+        </div>
+        {onClear && hasRating ? (
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+            }}
+            className="text-xs font-medium text-white/70 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            Clear rating
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function RatingPill({
+  rating,
+  disabled,
+  onClick,
+}: {
+  rating: number | null;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const hasRating = typeof rating === "number";
+  const label = hasRating ? `Edit rating: ${rating}` : "Add rating";
+  const display = hasRating ? rating : "Rate";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={clsx(
+        "inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-1 text-sm text-white/85 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        disabled && "cursor-not-allowed opacity-60 hover:bg-white/5",
+      )}
+      aria-label={label}
+    >
+      <Star
+        className={clsx("h-4 w-4", hasRating ? "text-[#2563EB]" : "text-white/40")}
+        strokeWidth={hasRating ? 1.4 : 1.2}
+        fill={hasRating ? "currentColor" : "none"}
+        aria-hidden="true"
+      />
+      <span className="font-semibold text-white">{display}</span>
+    </button>
+  );
+}
+
 type FeedbackIcon = typeof Heart;
 
 function FeedbackButton({
@@ -252,7 +729,7 @@ function FeedbackButton({
       className={clsx(
         "h-9 w-9 rounded-full border border-white/20 bg-black/40 px-0 text-zinc-200 transition-colors hover:bg-white/10",
         active && activeClass,
-        disabled && "opacity-60",
+        disabled && "opacity-60"
       )}
       title={label}
     >
@@ -271,7 +748,9 @@ function formatRating(value: unknown): string {
     if (!trimmed) return "";
     const numeric = Number(trimmed);
     if (!Number.isNaN(numeric)) {
-      return Number.isInteger(numeric) ? numeric.toString() : numeric.toFixed(1);
+      return Number.isInteger(numeric)
+        ? numeric.toString()
+        : numeric.toFixed(1);
     }
     return trimmed;
   }

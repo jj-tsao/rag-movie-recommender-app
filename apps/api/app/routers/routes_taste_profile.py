@@ -1,45 +1,53 @@
 from fastapi import APIRouter, Depends, HTTPException
-from qdrant_client import QdrantClient
+from reelix_core.types import MediaType
+from reelix_user.taste.embedding_store import QdrantEmbeddingStore
+from reelix_user.taste.taste_profile_repo import SupabaseTasteProfileRepo
+from reelix_user.taste.taste_profile_service import TasteProfileService
 
-from app.deps.supabase_client import get_supabase_client, get_current_user_id
 from app.deps.deps import get_qdrant
-from app.repositories.taste_profile_store import fetch as fetch_profile
-from services.taste_profile_service import rebuild_and_store
+from app.deps.supabase_client import (
+    get_current_user_id,
+    get_supabase_client,
+    get_user_context_service,
+)
+from app.schemas import (
+    TasteProfileExistsOut,
+)
 
-router = APIRouter(prefix="/taste_profile", tags=["taste"])
+router = APIRouter(prefix="/v2/users/me/taste_profile", tags=["taste"])
 
 
-@router.get("/me")
-async def get_my_profile(
+def get_service(
     sb=Depends(get_supabase_client),
+    user_context=Depends(get_user_context_service),
+    qdrant=Depends(get_qdrant),
+) -> TasteProfileService:
+    repo = SupabaseTasteProfileRepo(sb)
+    embeddings = QdrantEmbeddingStore(qdrant)
+    return TasteProfileService(repo, user_context, embeddings)
+
+
+# Check taste profile existence (404 when missing)
+@router.get("", response_model=TasteProfileExistsOut)
+async def get_my_taste_profile(
+    media_type: MediaType = MediaType.MOVIE,
     user_id: str = Depends(get_current_user_id),
+    service: TasteProfileService = Depends(get_service),
 ):
-    row = await fetch_profile(sb, user_id)
-    if not row:
-        raise HTTPException(404, "Not found")
-    return {
-        "last_built_at": row["last_built_at"],
-        "positive_n": row["positive_n"],
-        "negative_n": row["negative_n"],
-        "dim": len(row["dense"]),
-    }
+    meta = await service.get_meta(user_id, media_type)
+    if not meta:
+        # important: ForYouPage expects 404 when no profile exists
+        raise HTTPException(status_code=404, detail="Taste profile not found")
+    return TasteProfileExistsOut(**meta.model_dump(), has_profile=True)
 
 
+# Rebuild taste profile
 @router.post("/rebuild")
-async def rebuild_my_profile(
-    sb=Depends(get_supabase_client),
+async def rebuild_taste_profile(
+    # req: TasteProfileRebuildRequest,
     user_id: str = Depends(get_current_user_id),
-    qdrant: QdrantClient = Depends(get_qdrant),
+    service: TasteProfileService = Depends(get_service),
 ):
-    vec, debug = await rebuild_and_store(
-        sb,
-        user_id,
-        qdrant,
-        media_type="movie",
-        # text_embedder=text_embedder,
-    )
-    return {
-        "dim": int(vec.shape[0]),
-        "pos_count": debug["pos_count"],
-        "neg_count": debug["neg_count"],
-    }
+    result = await service.rebuild(user_id, media_type=MediaType.MOVIE)
+    # Return small meta so client can choose to refresh its feed
+    return {"ok": True, "meta": result}
