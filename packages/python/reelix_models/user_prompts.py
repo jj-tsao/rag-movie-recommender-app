@@ -1,41 +1,33 @@
 from __future__ import annotations
-from typing import Iterable, Mapping, List, Optional
-import re
-from reelix_ranking.types import Candidate
-from reelix_core.types import UserSignals
 
+import re
+from typing import Iterable, List, Mapping, Optional
+from datetime import datetime, timezone
+from reelix_core.types import UserSignals, BuildParams, MediaId
+from reelix_ranking.types import Candidate
+from reelix_user.signals.weights import compute_item_weights
+from reelix_user.signals.selectors import select_titles_for_prompt
 
 DEFAULT_LIMITS = dict(
     genres=7,
     keywords=12,
-    liked=7,
-    disliked=5,
+    pos=7,
+    neg=2,
 )
 
 
 # == User prompt builder for for-you feed discovery mode ==
-
-
 def build_for_you_user_prompt(
     *,
     candidates: List[Candidate],
     user_signals: UserSignals,
     query_text: Optional[str] = None,
     limits: Mapping[str, int] = DEFAULT_LIMITS,
-    batch_size: int = 6,
+    batch_size: int = 8,
+    params: BuildParams = BuildParams(),
 ) -> str:
     """
     Build the User Prompt for the discover/for-you/why LLM call.
-
-    Args:
-        candidates: Ordered list of Candidate items.
-        user_genres: Iterable of user-selected genres (already ranked/weighted upstream).
-        user_keywords: Iterable of user-selected keywords/vibes (already ranked/weighted upstream).
-        liked_titles: Iterable of positively-rated titles (recent/highest-weight first).
-        disliked_titles: Iterable of negatively-rated titles (strongest negatives first).
-        query_text: Optional short session theme (≤ ~12 words). If None, note as “no explicit request”.
-        limits: Caps for genres/keywords/liked/disliked. Defaults match recommended ranges.
-
     Returns:
         Markdown string for the User Prompt to send to LLM.
     """
@@ -64,10 +56,26 @@ def build_for_you_user_prompt(
         return re.sub(r"```", "``\u200b`", block or "")
 
     # context attributes
-    pos_titles = [i.title for i in user_signals.loved_titles()]
-    if len(pos_titles) < 7:
-        pos_titles.extend([i.title for i in user_signals.liked_titles()])
-    neg_titles = [i.title for i in user_signals.disliked_titles()]
+    now = datetime.now(timezone.utc)
+
+    # compute canonical weight per title
+    weights = compute_item_weights(user_signals.interactions, now, params)
+
+    # select positive and negative titles by weights
+    pos_ids, neg_ids = select_titles_for_prompt(
+        weights,
+        K_pos=limits.get("pos", 7),
+        K_neg=limits.get("neg", 5),
+    )
+
+    titles_by_media: dict[MediaId, str] = {
+        it.media_id: it.title
+        for it in user_signals.interactions
+        if getattr(it, "title", None)
+    }
+
+    pos_titles = [titles_by_media[mid] for mid in pos_ids if mid in titles_by_media]
+    neg_titles = [titles_by_media[mid] for mid in neg_ids if mid in titles_by_media]
 
     # apply dedupe + caps
     genres = _cap(
@@ -76,11 +84,8 @@ def build_for_you_user_prompt(
     keywords = _cap(
         _dedupe_keep_order(user_signals.keywords_include), limits.get("keywords", 12)
     )
-    liked = _cap(_dedupe_keep_order(pos_titles), limits.get("liked", 7))
-    disliked = _cap(
-        _dedupe_keep_order(neg_titles),
-        limits.get("disliked", 5),
-    )
+    liked = _cap(pos_titles, limits.get("pos", 7))
+    disliked = _cap(neg_titles, limits.get("neg", 5))
 
     parts: list[str] = []
 
@@ -101,7 +106,7 @@ def build_for_you_user_prompt(
     parts.append(f"- Selected Genres: {_csv(genres)}")
     parts.append(f"- Selected Keywords: {_csv(keywords)}")
     parts.append(f"- Liked Titles: {_csv(liked)} ")
-    parts.append(f"- Disliked Titles: {_csv(disliked) or 'None'}")
+    parts.append(f"- Disliked Titles: {_csv(disliked)}")
     parts.append("")
 
     # candidates
@@ -124,14 +129,18 @@ def build_for_you_user_prompt(
 
     # explicit instructions (verbatim from template expectations)
     parts.append("\n**Instructions:**")
-    parts.append("- Output six recommendation lines using the specified format.")
+    parts.append(
+        f"- Output {batch_size} recommendation lines using the specified format."
+    )
+    parts.append(
+        "- For each candidate, you may reference the user's liked and disliked titles as evidence, "
+        "but you must never say the user will like a title because they already like the exact same title."
+    )
 
     return "\n".join(parts)
 
 
 # == User prompt builder for interactive recommendation mode ==
-
-
 def format_rec_context(candidates: list):
     context = "\n\n".join([c.payload.get("llm_context", "") for c in candidates])
     return context

@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import List, Iterable, Tuple, Annotated, Dict, Any
-from pydantic import BaseModel, Field, AfterValidator
+from typing import Annotated, Any, Dict, List, Tuple
+
+from pydantic import AfterValidator, BaseModel, Field
 
 MediaId = int
 
@@ -35,36 +36,19 @@ class Interaction:
     media_type: str  # 'movie' | 'tv'
     media_id: MediaId  # tmdb id
     title: str
-    kind: str  # 'love' | 'like' | 'dislike'
+    kind: str  # 'rec_reaction' | 'rating' | 'trailer_view' | 'add_to_watchlis' | 'remove_from_watchlist' | ...
+    reaction: str | None  # 'love' | 'like' | 'dislike'
+    value: float | None  # 1-10 title rating
     ts: datetime  # tz-aware
 
 
 @dataclass
 class UserSignals:
+    user_id: str
     genres_include: list[str]
     keywords_include: list[str]
     interactions: list[Interaction]
     exclude_media_ids: list[int]
-
-    def _by_kind(self, kinds: Iterable[str]) -> List[Interaction]:
-        kinds_norm = {k.lower() for k in kinds}
-        return [i for i in self.interactions if i.kind.lower() in kinds_norm]
-
-    def positive_interactions(self) -> List[Interaction]:
-        """Interactions where kind is 'like' or 'love'."""
-        return self._by_kind({"like", "love"})
-
-    def loved_titles(self) -> List[Interaction]:
-        """Interactions where kind is 'love'."""
-        return self._by_kind({"love"})
-
-    def liked_titles(self) -> List[Interaction]:
-        """Interactions where kind is 'like'."""
-        return self._by_kind({"like"})
-
-    def disliked_titles(self) -> List[Interaction]:
-        """Interactions where kind is 'dislike'."""
-        return self._by_kind({"dislike"})
 
 
 @dataclass
@@ -74,16 +58,16 @@ class UserTasteContext:
     negative_n: int | None
     last_built_at: datetime | None
     signals: UserSignals
-    active_subscriptions: list[int]
+    active_subscriptions: list[int] | None
     provider_filter_mode: str | None
 
 
 @dataclass
 class BuildParams:
     dim: int = 768
-    w_love: float = 2.0
-    w_like: float = 1.0
-    w_dislike: float = 1.5
+    w_love: float = 0.9
+    w_like: float = 0.5
+    w_dislike: float = 1
     lambda_month: float = 0.05  # decay per 30 days (half-life = 12 months)
     alpha: float = 1.0  # +pos centroid
     beta: float = 0.6  # −neg centroid
@@ -99,7 +83,9 @@ class PromptsEnvelope(BaseModel):
         default_factory=dict
     )  # temp/top_p/seed/max_tokens, etc.
     recipe: Dict[str, Any] = Field(default_factory=dict)
-    output: Dict[str, Any] = Field(default_factory=lambda: {"format":"jsonl","schema_version":"1"})
+    output: Dict[str, Any] = Field(
+        default_factory=lambda: {"format": "jsonl", "schema_version": "1"}
+    )
     calls: list["LLMCall"] = Field(
         default_factory=list
     )  # one or many calls with caching

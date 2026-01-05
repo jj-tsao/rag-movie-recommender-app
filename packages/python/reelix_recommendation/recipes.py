@@ -15,7 +15,7 @@ class ForYouFeedRecipe(BaseRecipe):
         *,
         media_type: str,
         query_text: str | None,
-        query_filter: QueryFilter | None,
+        query_filter: QueryFilter,
         user_context: UserTasteContext | None,
     ):
         if not user_context:
@@ -28,19 +28,21 @@ class ForYouFeedRecipe(BaseRecipe):
         )
         sparse_vec = self.query_encoder.encode_sparse(bm25_bag, media_type)
 
-        filters = self.build_discover_filter(user_context)
+        filters = self.build_discover_filter(user_context, query_filter)
 
         return dense_vec, sparse_vec, filters
 
     def pipeline_params(self):
         return dict(
             final_top_k=20,
+            # sparse_depth=40,
             weights=dict(
-                dense=0.56,
-                sparse=0.13,
+                dense=0.54,
+                sparse=0.12,
                 rating=0.15,
                 popularity=0.04,
-                genre=0.12,
+                genre=0.10,
+                recency=0.05,
             ),
         )
 
@@ -48,6 +50,7 @@ class ForYouFeedRecipe(BaseRecipe):
         self,
         *,
         query_text: str,
+        batch_size: int = 8,
         user_context: UserTasteContext,
         candidates: list,
         llm_model: str | None = None,
@@ -58,8 +61,8 @@ class ForYouFeedRecipe(BaseRecipe):
             recipe_name=self.name,
             candidates=candidates,
             user_signals=user_context.signals,
+            batch_size=batch_size,
         )
-
         envelope = self.build_prompt_envelope(
             self.name, system_prompt, user_prompt, candidates
         )
@@ -101,13 +104,19 @@ class InteractiveRecipe(BaseRecipe):
         )
 
     def build_prompt(
-        self, *, query_text: str, user_context: UserTasteContext, candidates
+        self,
+        *,
+        query_text: str,
+        batch_size: int = 20,
+        user_context: UserTasteContext,
+        candidates,
     ) -> PromptsEnvelope:
         system_prompt = self.get_system_prompt(recipe_name=self.name)
         user_prompt = self.build_user_prompt(
             recipe_name=self.name,
             candidates=candidates,
             query_text=query_text,
+            batch_size=batch_size,
             user_signals=user_context.signals if user_context else None,
         )
 

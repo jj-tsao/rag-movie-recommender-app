@@ -17,15 +17,14 @@ def build_filter(query_filter: QueryFilter | None = None) -> QFilter:
     return qfilter
 
 
-def build_discover_filter(user_context: UserTasteContext) -> QFilter:
+def build_discover_filter(user_context: UserTasteContext, query_filter: QueryFilter) -> QFilter:
     exclude_ids = user_context.signals.exclude_media_ids
-
-    provider_mode = user_context.provider_filter_mode
-    user_subs = user_context.active_subscriptions
 
     return build_qfilter(
         exclude_ids=exclude_ids if exclude_ids else [],
-        providers=user_subs if provider_mode == "SELECTED" else [],
+        genres=query_filter.genres,
+        providers=query_filter.providers,
+        year_range=query_filter.year_range,    
     )
 
 

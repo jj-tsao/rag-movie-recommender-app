@@ -3,8 +3,10 @@ from typing import Dict, List
 from reelix_ranking.types import Candidate
 
 
-def merge_by_id(dense: List[Candidate], sparse: List[Candidate], keep_ids: set[str]) -> List[Candidate]:
-    by_id: Dict[str, Candidate] = {}
+def merge_by_id(
+    dense: List[Candidate], sparse: List[Candidate], keep_ids: set[int]
+) -> List[Candidate]:
+    by_id: Dict[int, Candidate] = {}
     for c in dense + sparse:
         if c.id not in keep_ids:
             continue

@@ -1,13 +1,19 @@
 from __future__ import annotations
-import os
-import time
-import hmac
-import hashlib
-from typing import Any, Iterable, Literal
-import httpx
-from pydantic import BaseModel
 
-Endpoint = Literal["discovery", "recommendations"]
+import time
+from typing import Any, Literal, Mapping
+
+import httpx
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+from reelix_ranking.types import Candidate, ScoreTrace
+from reelix_core.types import QueryFilter
+
+Endpoint = Literal[
+    "discovery/for-you",
+    "discovery/explore",
+    "recommendations/interactive",
+]
 
 
 # ---------- Public models (optional typing nicety) ----------
@@ -15,6 +21,11 @@ class DeviceInfo(BaseModel):
     device_type: str | None = None
     platform: str | None = None
     user_agent: str | None = None
+
+
+class FinalRec(BaseModel):
+    media_id: int
+    why: str
 
 
 # ---------- Core logger ----------
@@ -75,16 +86,14 @@ class TelemetryLogger:
             )
             if r.status_code not in (200, 201, 204):
                 print(
-                    f"⚠️ rec_logger POST {path} failed {r.status_code}: {r.text[:300]}"
+                    f"⚠️ rec_logger POST {path} failed {r.status_code}: {r.text}"
                 )
         except Exception as e:
             print(f"❌ rec_logger POST {path} error: {e}")
 
     @staticmethod
-    def hmac_hash(value: str, secret: str) -> str:
-        return hmac.new(
-            secret.encode("utf-8"), value.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+    def to_jsonable(x):
+        return jsonable_encoder(x, exclude_none=True)
 
     # ---------- Public APIs ----------
     async def log_query_intake(
@@ -96,6 +105,8 @@ class TelemetryLogger:
         session_id: str | None = None,
         media_type: str,
         query_text: str | None = None,
+        query_filters: QueryFilter | None = None,
+        ctx_log: dict[str, Any] | None = None,
         pipeline_version: str | None,
         batch_size: int,
         device_info: DeviceInfo | None = None,
@@ -116,12 +127,15 @@ class TelemetryLogger:
             "user_id": user_id,
             "session_id": session_id,
             "media_type": media_type,
+            "ctx_log": ctx_log,
             "pipeline_version": pipeline_version,
             "batch_size": int(batch_size),
             "request_meta": meta,
         }
         if query_text:
             row["query_text"] = query_text
+        if query_filters:
+            row["query_filters"] = self.to_jsonable(query_filters)
 
         async with httpx.AsyncClient() as client:
             await self._post(client, "rec_queries", [row])
@@ -131,24 +145,67 @@ class TelemetryLogger:
         *,
         endpoint: Endpoint,
         query_id: str,
-        candidates: Iterable[dict[str, Any]],
+        media_type: str,
+        candidates: list[Candidate],
+        traces: Mapping[int, ScoreTrace],
+        stage: str,
     ) -> None:
         """
-        Insert N rows into rec_results. Each candidate dict can include:
-          media_id (str), rank (int), title (str), release_year (int), genres (list[str]),
-          poster_url (str), score_final (float), score_parts (dict), source_meta (dict)
+        Insert N rows into rec_results.
         """
         if not self._enabled():
             return
         rows = []
-        for c in candidates:
-            row = {"endpoint": endpoint, "query_id": query_id}
-            row.update(c or {})
+        for r, c in enumerate(candidates, start=1):
+            cid = c.id
+            trace = traces.get(cid)
+            row = {
+                "endpoint": endpoint,
+                "query_id": query_id,
+                "media_type": media_type,
+                "media_id": cid,
+                "rank": r,
+                "title": c.payload.get("title"),
+                "score_final": trace.final_score if trace else None,
+                "score_dense": trace.dense_score if trace else None,
+                "score_sparse": trace.sparse_score if trace else None,
+                "meta_breakdown": self.to_jsonable(trace.meta_breakdown)
+                if trace
+                else None,
+                "stage": stage,
+            }
             rows.append(row)
         if not rows:
             return
         async with httpx.AsyncClient() as client:
             await self._post(client, "rec_results", rows)
+
+    async def log_why(
+        self,
+        *,
+        endpoint: str,
+        query_id: str,
+        final_recs: list[FinalRec],
+    ) -> None:
+        """
+        Update interactive mode final recs per row.
+        """
+        if not self._enabled():
+            return
+        rows = []
+        for r in final_recs:
+            row = {
+                "endpoint": endpoint,
+                "query_id": query_id,
+                "media_id": r.media_id,
+                "stage": "final",
+                "why_summary": r.why,
+            }
+            rows.append(row)
+        if not rows:
+            return
+        async with httpx.AsyncClient() as client:
+            await self._post(client, "rec_results?on_conflict=endpoint,query_id,media_id", rows)
 
     def start_stream(
         self, *, endpoint: Endpoint, query_id: str, batch_id: int | None
@@ -156,34 +213,6 @@ class TelemetryLogger:
         return StreamAggregator(
             logger=self, endpoint=endpoint, query_id=query_id, batch_id=batch_id
         )
-
-    async def log_recommendations_ext(
-        self,
-        *,
-        query_id: str,
-        query_text: str,
-        language: str | None = None,
-        filters: dict | None = None,
-        intent: dict | None = None,
-        params: dict | None = None,
-    ) -> None:
-        """
-        Insert one row into rec_recommendations_ext (for /recommendations/interactive).
-        """
-        if not self._enabled():
-            return
-        payload = [
-            {
-                "query_id": query_id,
-                "query_text": query_text,
-                "language": language,
-                "filters": (filters or {}),
-                "intent": (intent or {}),
-                "params": (params or {}),
-            }
-        ]
-        async with httpx.AsyncClient() as client:
-            await self._post(client, "rec_recommendations_ext", payload)
 
     async def upsert_session(
         self,
@@ -289,11 +318,3 @@ class StreamAggregator:
             return
         async with httpx.AsyncClient() as client:
             await self.logger._post(client, "rec_stream_events", rows)
-
-
-# ---------- Convenience helpers ----------
-def hash_user_id(user_id: str | None) -> str | None:
-    if not user_id:
-        return None
-    secret = os.getenv("REC_HASH_SECRET") or os.getenv("SUPABASE_API_KEY") or "dev"
-    return TelemetryLogger.hmac_hash(user_id, secret)

@@ -35,9 +35,10 @@ class BaseRetriever:
         qfilter: Optional[QFilter] = None,
         limit: int = 300,
     ) -> List[Candidate]:
-        res = self.client.search(
+        res = self.client.query_points(
             collection_name=self._col(media_type),
-            query_vector=qmodels.NamedVector(name=self.dense_name, vector=dense_vec),
+            query=dense_vec,
+            using=self.dense_name,
             limit=limit,
             with_payload=[
                 "llm_context",
@@ -49,15 +50,21 @@ class BaseRetriever:
                 "poster_url",
                 "backdrop_url",
                 "trailer_key",
-                "popularity",
+                "imdb_rating",
+                "imdb_votes",
+                "rt_score",
                 "vote_average",
                 "vote_count",
+                "popularity",
+                "release_date",
+                "collection",
             ],
             query_filter=qfilter,
+            with_vectors=False,
         )
         return [
-            Candidate(id=p.id, payload=p.payload, dense_score=float(p.score))
-            for p in res
+            Candidate(id=int(p.id), payload=p.payload if p.payload is not None else {}, dense_score=float(p.score))
+            for p in res.points
         ]
 
     def sparse(
@@ -67,17 +74,16 @@ class BaseRetriever:
         qfilter: Optional[QFilter] = None,
         limit: int = 20,
     ) -> List[Candidate]:
-        res = self.client.search(
+        sparse_query = qmodels.SparseVector(
+            indices=[int(i) for i in sparse_vec.get("indices", [])],
+            values=[float(v) for v in sparse_vec.get("values", [])],
+        )
+
+        res = self.client.query_points(
             collection_name=self._col(media_type),
-            query_vector=qmodels.NamedSparseVector(
-                name=self.sparse_name,
-                vector=qmodels.SparseVector(
-                    indices=[int(i) for i in sparse_vec.get("indices", [])],
-                    values=[float(v) for v in sparse_vec.get("values", [])],
-                ),
-            ),
+            query=sparse_query,
+            using=self.sparse_name,
             limit=limit,
-            # Sparse phase does not need CE text; keep payload light
             with_payload=[
                 "llm_context",
                 "embedding_text",
@@ -88,13 +94,19 @@ class BaseRetriever:
                 "poster_url",
                 "backdrop_url",
                 "trailer_key",
-                "popularity",
+                "imdb_rating",
+                "imdb_votes",
+                "rt_score",
                 "vote_average",
                 "vote_count",
+                "popularity",
+                "release_date",
+                "collection",
             ],
             query_filter=qfilter,
+            with_vectors=False,
         )
         return [
-            Candidate(id=p.id, payload=p.payload, sparse_score=float(p.score))
-            for p in res
+            Candidate(id=int(p.id), payload=p.payload if p.payload is not None else {}, sparse_score=float(p.score))
+            for p in res.points
         ]

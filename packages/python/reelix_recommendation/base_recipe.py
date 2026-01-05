@@ -2,7 +2,13 @@ import time
 import json
 import hashlib
 from typing import Dict, Any, List
-from reelix_core.types import QueryFilter, UserTasteContext, UserSignals, PromptsEnvelope, LLMCall
+from reelix_core.types import (
+    QueryFilter,
+    UserTasteContext,
+    UserSignals,
+    PromptsEnvelope,
+    LLMCall,
+)
 from reelix_core.config import CHAT_COMPLETION_MODEL
 
 
@@ -12,11 +18,11 @@ class BaseRecipe:
         from reelix_recommendation.recipe_helpers import build_filter
 
         return build_filter(query_filter)
-    
-    def build_discover_filter(self, user_context: UserTasteContext):
+
+    def build_discover_filter(self, user_context: UserTasteContext, query_filter: QueryFilter):
         from reelix_recommendation.recipe_helpers import build_discover_filter
-        
-        return build_discover_filter(user_context)
+
+        return build_discover_filter(user_context, query_filter)
 
     def build_bm25_query(self, genres, keywords):
         from reelix_recommendation.recipe_helpers import build_bm25_query
@@ -36,6 +42,7 @@ class BaseRecipe:
         candidates: list,
         query_text: str | None = None,
         user_signals: UserSignals | None = None,
+        batch_size: int,
     ):
         from reelix_models.user_prompts import build_for_you_user_prompt
         from reelix_models.user_prompts import build_interactive_user_prompt
@@ -45,7 +52,7 @@ class BaseRecipe:
                 raise ValueError("ForYouFeedRecipe requires user_signals")
             else:
                 return build_for_you_user_prompt(
-                    candidates=candidates, user_signals=user_signals
+                    candidates=candidates, user_signals=user_signals, batch_size=batch_size
                 )
 
         if recipe_name == "interactive":
@@ -58,6 +65,20 @@ class BaseRecipe:
 
         else:
             raise ValueError("LLM prompt build failed: unknown recipe.")
+
+    def build_context_log(self, ctx: UserTasteContext | None) -> dict[str, Any]:
+        if not ctx:
+            return {}
+        signals = getattr(ctx, "signals", None)
+        genres = getattr(signals, "genres_include", []) if signals else []
+        keywords = getattr(signals, "keywords_include", []) if signals else []
+
+        return {
+            "genres": genres,
+            "keywords": keywords,
+            "active_subs": getattr(ctx, "active_subscriptions", []),
+            "subs_filter_mode": getattr(ctx, "provider_filter_mode", None),
+        }
 
     # build the prompt envelope for ticket_store
     def build_prompt_envelope(

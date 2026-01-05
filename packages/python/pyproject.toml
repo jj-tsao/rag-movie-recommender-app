@@ -1,7 +1,7 @@
 [project]
 name = "reelix-core"
 version = "0.1.0"
-description = "Core Python packages for Reelix (retrieval, intent, utils)"
+description = "Core Python packages for Reelix"
 requires-python = ">=3.10"
 
 [build-system]

@@ -1,4 +1,4 @@
-from typing import Tuple, List, Dict
+from typing import Any
 from reelix_recommendation.types import OrchestrationRecipe
 from reelix_recommendation.recommend import RecommendPipeline
 from reelix_core.types import UserTasteContext, QueryFilter, PromptsEnvelope
@@ -11,10 +11,11 @@ def orchestrate(
     media_type: str,
     query_text: str | None = None,
     query_filter: QueryFilter | None = None,
+    batch_size: int,
     user_id: str | None = None,
     user_context: UserTasteContext | None = None,
     pipeline: RecommendPipeline,
-) -> Tuple[List[Candidate], Dict[str, ScoreTrace], PromptsEnvelope]:
+) -> tuple[list[Candidate], dict[int, ScoreTrace], dict[str, Any], PromptsEnvelope]:
     dense_vec, sparse_vec, qfilter = recipe.build_inputs(
         media_type=media_type,
         query_text=query_text,
@@ -35,10 +36,15 @@ def orchestrate(
     )
 
     # server side debug print
-    pipeline.summarize_ranking(final)
+    # pipeline.summarize_ranking(final)
+
+    ctx_log = recipe.build_context_log(user_context)
 
     llm_prompts = recipe.build_prompt(
-        query_text=query_text, user_context=user_context, candidates=final
+        query_text=query_text,
+        batch_size=batch_size,
+        user_context=user_context,
+        candidates=final,
     )
 
-    return final, traces, llm_prompts
+    return final, traces, ctx_log, llm_prompts

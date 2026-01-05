@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import List, Tuple
 
 
-def rrf(rankings: List[List[str]], k: int = 60) -> List[Tuple[str, float]]:
+def rrf(rankings: List[List[int]], k: int = 60) -> List[Tuple[int, float]]:
     """
     Reciprocal Rank Fusion.
     rankings: list of ranked ID lists, e.g., [[id1,id2,...], [id3,id1,...]]
