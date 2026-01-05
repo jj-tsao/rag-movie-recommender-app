@@ -1,4 +1,4 @@
-# 🎬 Reelix AI – Personalized Movie & TV Show Discovery
+# 🎬 Reelix AI – Personalized Movie & TV Discovery Agent
 
 **Reelix** is an AI-native discovery agent that understands *vibes* and turns them into cinematic picks.
 
@@ -12,91 +12,249 @@
 
 ---
 
-Reelix finds your next favorite movies/shows by learning your **personal taste** and the **vibes** you want (themes, tone, pacing, genres).
-
-Under the hood, it combines:
-
-- **Taste vector (SentenceTransformers)** to model what you like (and don’t)
-- **Hybrid retrieval (dense embeddings + BM25)** to surface high-signal candidates
-- **Metadata-aware reranking** (quality, popularity, genre overlap, recency)
-- **Cross-Encoder reranker** for precise final ordering
-- **LLM “why you’ll enjoy it”** rationales, streamed via **SSE** to the UI
-
-The result is a fast, **personal For-You recommendation feed** and a flexible **“Explore by Vibe”** experience that adapts as you give feedback.
-
 👉 Try our **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
+
+---
+
+Reelix finds your next favorite watch by learning your **personal preferences**, evolving **taste**, and preferred **vibes** (themes, tone, pacing, genres).
+
+Architecturally, Reelix is an **AI-native discovery agent** built on top of a modern **hybrid recommendation system**. A small team of collaborating agents sits above hybrid retrieval, cross-encoder reranking, and LLM-based explainability.
+
+Under the hood, Reelix is a three-agent system (Orchestrator → Recommendation → Explanation):
+
+- **Agentic workflow (3 collaborating agents)**  
+  - **Orchestrator Agent** — parses user queries + recent context, infers intent, and keeps a structured plan (retrieval shape, filters, personalization inputs, etc.) and short-term session memory alive across multi-turn interactive iterations.
+
+  - **Recommendation Agent** — executes that plan with a **RAG-based, hybrid retrieval pipeline**: dense + sparse (BM25) retrieval over the catalog, fusion, metadata/cross-encoder reranking, and a final LLM curator scoring pass over a small candidate pool.  
+
+  - **Explanation Agent** — takes the ranked slate + taste profile and generates grounded “Why you might enjoy it” rationales, streaming them to the UI and writing them to Supabase + Redis as logged signals for reuse, taste profile updates, offline analysis, and model / ranking retraining.
+
+- **Hybrid retrieval engine**  
+  - **Query encoding & expansion** — take natural-language vibe queries (“neo-noir psychological thriller”, “slow-burn sci-fi drama”) and turn them into dense + sparse signals (embeddings, BM25 terms, optional expansions / boosts by LLM).  
+  - **Dense** — fine-tuned SentenceTransformers (`bge-base-en-v1.5`) over titles, synopsis, and curated metadata.  
+  - **Sparse** — BM25 over cleaned text for lexical precision and long-tail matches.  
+  - **Fusion** — ANN over dense vectors + BM25 ranked lists, combined with RRF / weighted fusion to build a robust candidate set.
+
+- **Multi-stage ranking (multi-objective)**  
+  - A **metadata-aware scorer** combines content quality, popularity, freshness, and diversity / de-dupe objectives.  
+  - A **cross-encoder reranker** re-scores a small window (e.g. top-30) for precise final ordering.  
+  - **LLM-assisted vibe matching** (narrow pass) — an LLM score is blended into ranking for a small candidate pool, improving alignment to the user’s free-form vibe.
+
+- **Personalization**  
+  - A **user taste vector** built from interactions (love / like / dislike, star ratings, watchlist, trailer watch, etc.).  
+  - Cold-start behavior falls back to content-centric priors (global popularity / quality) plus explicit user preference signals (genres, services, etc.).
+
+
+- **Grounded LLM synthesis**  
+  - The **Explanation Agent** generates “Why you might enjoy it” rationales grounded in the ranked slate + taste profile.  
+  - Results are streamed via SSE to the UI and cached in Supabase + Redis for reuse.
+
+
+The result is a fast, AI-led natural language **“Explore by Vibe”** and **For-You feed** experience that **adapts** in real time as users interact.
+
 
 ---
 ## ✨ Core Experiences
 
-- **Taste Onboarding (`/taste`)** — Quickly signal your preferences (genre/vibe picks; Love / Like / Dislike; trailer views). We build and store a taste vector that refines as you give more feedback.
-- **For-You Feed (`/discover`)** — A personalized grid of picks. Each card streams a short rationale and a markdown-rich movie/TV card.
-- **Explore by Vibe (`/query`)** — Type “psychological thrillers with a satirical tone,” or tap example chips to see vibe-specific recommendations. Add filters for year range, genres, and streaming services.
+- **Taste Onboarding (`/taste`)**  
+  Quickly signal your preferences (genre / vibe picks; Love / Like / Dislike). The agents use this to initialize your **user taste vector**, which the Orchestrator Agent pulls into every subsequent plan and refines as you give more feedback.
+
+- **Explore by Vibe (`/query`)**  
+  Type “psychological thrillers with a satirical tone”. The **Orchestrator Agent** parses your natural-language vibe, builds a retrieval plan (depth, filters, personalization), and calls the **Recommendation Agent** + **Explanation Agent** to stream back grounded, vibe-matched recommendations.
+
+- **For-You Feed (`/discover`)**  
+  A personalized grid of picks generated by the same multi-agent loop. The Orchestrator Agent leans more heavily on your **taste history**; each card streams a short “Why you might enjoy it” rationale from the Explanation Agent, powered by ranked context from the Recommendation Agent.
+
+- **Add to Watchlist (`/watchlist`)**  
+  Save titles to watch later, flip to “Watched,” and (optionally) rate 1–10 — all in one flow. Optimistic UI + idempotent API; every interaction emits **logged signals** that update your taste vector and feed into future agent plans, offline analysis, and model / ranking improvements.
 
 ### Quick Look
 
 > Reelix understands your vibe and curates markdown-rich suggestions, trailers, and rationale in real time.
 
-<img src="https://github.com/user-attachments/assets/ef03a55a-b9b5-4136-8654-5d7fa3f4e97d" alt="Reelix Preview" width="100%" />
-
+<img width="1050" height="890" alt="Image" src="https://github.com/user-attachments/assets/f900b15b-431b-4d0c-8135-0d1bce473c00" />
 
 ---
 
-## 🧠 How It Works (At a Glance)
+## 🧠 How It Works – Agentic Workflow at a Glance
 
-```
-Taste Signals ──▶ Taste Vector ────┐
-                                   │
-                                   ▼
-User Query ──▶ Dense + BM25 ──▶ Candidate Pool (RRF#1) ──▶ Metadata Rerank ──▶ CE Rerank ──▶ Final Fusion (RRF#2) ──▶ LLM "Why"
-                                   ▲                                                             │
-                                   │                                                             ▼
-                               Filters (Streaming services/genres/year)                       SSE stream to UI
+At runtime, Reelix is a **three-agent system** sitting on top of a hybrid retrieval + ranking engine:
+
+```text
+Taste Signals ─▶ Taste Vector ───┐
+                                 │
+User Query + context ────────┐   │
+                             ▼   ▼
+                      Orchestrator Agent (parse → RecQuerySpec; update across turns)
+                               │
+                               ▼
+                     Recommendation Agent (retrieve → fuse → rerank → LLM curator scoring)
+                               │
+                               ├────────────▶ Fast track JSON to UI (ranked slate + metadata)
+                               ▼
+                       Explanation Agent ("why" write-up → stream SSE → log/cache)
+                               │
+          ┌────────────────────┴────────────────────┐
+          ▼                                         ▼
+       SSE "why" to UI               Logs + Cache (Supabase / Redis)
+                                                    │
+                                                    ▼
+                                   Taste Updates, Analysis, Retraining
 ```
 
-- **Dense**: fine‑tuned `bge-base-en-v1.5` embeddings
-- **Sparse**: BM25 with tokenization/stop‑word cleanup
-- **Reranking**: weighted blend of semantic + sparse + quality + popularity (+ optional genre overlap)
-- **CE**: `BERT` Cross‑Encoder pairwise reranker
-- **Streaming**: reasons & markdown are delivered as **newline-delimited JSON over SSE**.
-- **Bootstrap & Lifespan**: loads intent classifier, embedder, BM25, CE reranker, Qdrant client, and configures ticket store.
-- **Orchestrator**: Recipes (`interactive`, `for_you_feed`) define inputs (query vs taste), retrieval params, and LLM prompt envelopes.
+
+### 1) Orchestrator Agent
+
+**Agentic orchestration layer** — *“What should we do next?”*
+
+The orchestrator converts messy natural language into a clean `RecQuerySpec` and keeps it stable across multi-turn refinement. It extracts only what’s clearly implied (precision > recall).
+
+- **Understands intent from conversation**  
+  - Interprets the current message in the context of recent turns
+  - Decides whether this is a new request, refinement, or a meta/non-rec question
+
+- **Builds a small, explicit plan** (`RecQuerySpec` as a “living object”)
+  - Parse intents into precise query_text, genres, sub-genres, tone, narrative shape
+  - Assembles filters (genres, year range, streaming providers, etc.)  
+  - Decides how much personalization to apply (taste vector, recent interactions)
+
+- **Routes to other agents and tools**  
+  - Calls the **Recommendation Agent** with the constructed plan to get a high-quality recommendations set  
+  - Calls the **Explanation Agent** to generate “Why you might enjoy it” rationales for the recommended titles  
+  - Can trigger taste profile updates or logging flows when appropriate
+
+- **Handles multi-turn refinement**  
+  - Treats follow-ups as **plan edits** rather than isolated queries  
+  - Preserves `query_id` and ticket-store state so downstream tools keep operating over the same evolving candidate pool instead of starting from scratch each time
+
+
+### 2) Recommendation Agent
+
+**Hybrid retrieval + multi-stage ranking layer** — *“What are the best candidates?”*
+
+This layer executes the `RecQuerySpec` using a hybrid + multi-stage ranking pipeline, then runs a curator scoring pass to keep results vibe-tight.
+
+- **Hybrid retrieval (RAG-style)**  
+  - Calls into Qdrant dense + sparse (BM25) to build a high-quality candidate set:  
+    - Dense retrieval over fine-tuned `bge-base-en-v1.5` embeddings  
+    - Sparse retrieval via BM25 over normalized text  
+    - RRF / weighted fusion to merge dense + sparse signals
+
+- **Metadata-aware + cross-encoder reranking**  
+  - Rating, popularity, recency/freshness  
+  - Optional genre / vibe alignment  
+  - Diversity / de-dupe to avoid franchise spam and near-duplicates
+  - Runs am optional **cross-encoder reranker** on a small window (e.g. top-30), then fuses CE scores back into the final ranking  
+
+- **LLM curator scoring pass**  
+  - Consumes structured intent: Uses the `RecQuerySpec` extracted by the orchestrator, plus candidate metadata.
+  - Scores every candidate on 4 axes (0–2 integers): genre_fit, tone_fit, structure_fit, theme_fit (strict + conservative scoring).
+  - Outputs strict JSON for downstream tiering + UI:
+    - A single JSON object with exactly opening + evaluation_results for every candidate.
+
+- **Fast path to UI**  
+  - Returns a **ranked slate with metadata** (titles, posters, scores) immediately so the frontend can render cards and layout **before** why-copy is ready.
+
+
+### 3) Explanation Agent
+
+**Reasoning & explanation + streaming** — *“Why these, and what next?”*
+
+- **Consumes**  
+  - Ranked slate from the **Recommendation Agent**
+  - The user’s taste profile and recent interactions  
+  - The current mode (Explore by Vibe vs. For-You)
+
+- **Builds structured prompts to**  
+  - Generate “**Why you might enjoy it**” copy per title  
+  - Avoid self-references or hallucinations  
+  - Produce markdown-friendly output for movie/TV cards
+
+- **Runs in parallel with UI rendering**  
+  - Kicks off as soon as the slate is available, while the UI is already showing cards and skeletons.
+
+- **Streams results via SSE / JSONL**  
+  - `started` → incremental `why_delta` events per `media_id` → `done`  
+  - Inserts the final “why” copy and associated metadata to Supabase and Redis for reuse
+
+
+### 4) Signals, feedback loops & taste updates
+
+- Logs final recs and user feedback (interactions, ratings, watchlist actions) into Supabase + Redis.  
+- Aggregates these signals into an updated **taste vector**, which the Orchestrator Agent pulls into future plans.  
+- Exposes rich logged signals (scores, why-copy, interaction outcomes) for **offline analysis** and future **model / ranking retraining**.
+
+Over time, these feedback loops turn Reelix into a richer **discovery agent**, not just a static recommender: it can adapt its plans, retrieval parameters, and even suggestion style based on how you interact.
 
 ---
 
 ## 🌐 Key API Endpoints
 
 ### 1) Taste Onboarding (`/taste`)
-Create a personal taste vector from your likes/dislikes and genre/vibe signals. The service builds and stores a dense taste profile, with endpoints to **inspect** and **rebuild** your profile:
+Build and maintain a personalized **taste vector** from your interactions and preferences. Stores profile state in Supabase and powers the For-You feed and Vibe Query ranking.
 
-1) `POST /taste_profile/rebuild`  
-   Rebuilds from interactions and persists to Supabase.
+1) `POST /taste_profile/rebuild`
+   - Aggregates **user signals**: recent interactions (e.g., Love / Like / Not for me, trailer views), selected genres/vibes, and any provider filters.
+   - Fetches the corresponding **item embeddings** from Qdrant and computes a **taste vector** (weighted aggregation + normalization).
+   - **Upserts** the profile into Supabase, recording metadata such as `vector_dim`, `n_signals_used`, `build_version`, and timestamps.
 
-2) `GET /taste_profile/me`  
-   Returns last build metadata & vector dim.
-
+3) `GET /taste_profile/me`
+   - Returns the latest **profile metadata** and a safe subset of fields for inspection.
+   - Useful for gating UX (“has profile been built?”) and for debugging profile freshness across sessions.
+   
 Under the hood, the rebuild process fetches user signals, loads item embeddings from Qdrant, and calls `build_taste_vector(...)`, then upserts the profile.
 
 ### 2) For-You Feed (`/discover`)
-Your **For-You** page streams personalized reasons (and a markdown-rich movie/TV profile) per item in real time. The flow is a two-step ticketed orchestration:
+Your **For-You** page streams personalized reasons (and a markdown-rich movie/TV profile) per item in real time. Uses a **ticket store** (keyed by `query_id`) with **idle** and **absolute** TTLs to bound prompt/candidate lifespan and prevent stale cross-user access.
 
-1) `POST /discovery/for-you`  
-   Returns the candidate list with metadata (year, genres, posters, trailers, etc.) plus a `stream_url` for reasons.
+1) `POST /discovery/for-you`
+   - Queries the user’s taste profile from the database.
+   - Runs the **for_you_feed** recipe (dense + BM25 + metadata + CE reranker) against the **user taste context** to fetch **Top-K** candidates.
+   - Builds the LLM prompt with those candidates and **persists it in the ticket store** (keyed by `query_id`).
+   - Returns the candidate list with metadata (year, genres, posters, trailers, etc.) **plus** a `stream_url` for reasons.
+   - Logs a **query-intake record** and a **Top-K candidate snapshot** (IDs, ranks, and **per-signal score traces**) to the database.
 
-2) `GET /discovery/for-you/why?query_id=...` (SSE)  
-   Streams events `{started, why_delta, done}` where `why_delta` includes `media_id`, optional `imdb_rating` and `rotten_tomatoes_rating`, and `why_you_might_enjoy_it` markdown.
+3) `GET /discovery/for-you/why?query_id=...` (SSE)
+   - Reads the LLM prompt and Top-K candidates from the ticket store.
+   - Performs LLM reasoning to generate concise “why you might enjoy it” copy.
+   - Streams events `{started, why_delta, done}` where `why_delta` includes `media_id`, optional `imdb_rating` and `rotten_tomatoes_rating`, and `why_you_might_enjoy_it` (markdown).
 
-The endpoint uses a **ticket store** (memory or Redis) with idle and absolute TTLs to hold LLM prompts and guard access by user ID.
+5) `POST /discovery/log/final_recs`
+   - Client posts the final chosen items **and** reasoning (after streaming completes).
+   - Upserts existing rows with `stage="final"` and the `why_summary`.
 
 ### 3) Vibe Query (`/query`)
-Explore by Vibe with free-form natural language and optional filters (e.g., streaming services). This uses a single streaming endpoint: we retrieve ~20 candidates, pass to LLM as context, LLM selects the finals and writes “Why,” and we stream that back to the client.
+Uses a **single streaming endpoint**, with a shared **ticket store** (keyed by `query_id`) and **idle/absolute TTLs** to bound prompt/candidate lifespan and prevent stale cross-user access.
 
 1) `POST /recommendations/interactive`
-- Runs the interactive recipe (dense + BM25 + metadata + CE reranker) to fetch ~20 top candidates.  
-- Builds the LLM prompt with those candidates and (if signed in) your taste context.  
-- **Streams** the final recommendations **and** their “why” write-ups directly as the response body (text stream).
+   - Runs the **interactive** recipe (dense + BM25 + metadata + CE reranker) against the user's **text query** and **taste context** to fetch **Top-K** candidates.
+   - Builds the LLM prompt with those candidates and performs LLM reasoning to generate concise “why you might enjoy it” copy.
+   - **Streams** the final recommendations **and** their “why” write-ups directly as the response body (text stream).
+   - Logs a **query-intake record** and a **Top-K candidate snapshot** (IDs, ranks, and **per-signal score traces**) to the database.
 
-This flow uses the same ticket store (memory or Redis) with idle and absolute TTLs to hold LLM prompts and guard access by user id.
+3) `POST /recommend/log/final_recs`
+   - Client posts the final chosen items **and** reasoning (after streaming completes).
+   - Upserts existing rows with `stage="final"` and the `why_summary`.
+
+### 4) Watchlist (`/watchlist`)
+Lets users save titles to watch later, mark them as watched, and optionally rate them (1–10). Designed to be idempotent and fast, with optimistic UI updates. Stores rows in Supabase (unique on `user_id` + `media_id`) and emits lightweight signals that feed back into the taste profile.
+
+1) `POST /watchlist`
+   - Adds or upserts an item in the user’s watchlist (reactivates if previously soft-deleted).
+   - Input fields like `title`, `poster_url`, etc. are denormalized hints to render immediately; canonical metadata lives in Qdrant/TMDB.
+   - Emits an interaction event (`watchlist_add`) for taste-signal logging.
+  
+2) `GET /watchlist`
+   - Lists the user’s watchlist items, with optional filters/pagination.
+   - Hydrates metadata fields like genres, release_year, artworks, and why_summary, so the client avoids a second fetch.
+
+3) `PATCH /watchlist/{media_id}`
+   - Atomically updates status and/or rating (ideal for “✓ Watched ▾ → quick-rate”).
+   - Emits an interaction event (`rating`) when a rating is present for taste-signal logging.
+
+4) `DELETE /watchlist/{media_id}`
+   - Remove from watchlist.
+   - Soft delete the item. Sets `deleted_at`, `deleted_reason`, and derives `is_active=False`.
 
 
 ### **Frontend details**
@@ -108,11 +266,13 @@ This flow uses the same ticket store (memory or Redis) with idle and absolute TT
 ## 🏗️ Recommendation Pipeline Architecture (High‑Level)
 
 ```
-User prompt ──▶ Intent Classifier ──┐
-                                    │ yes
-                                    ▼
-                            Query Encoder (dense + sparse)
+User Interactions ──▶ Taste Vector (user tower)
                                     │
+                                    │
+User Prompt ──▶ Query Encoder ──────┤
+                                    │ 
+                                  Filters (genres, year, streaming provider)
+                                    │ 
                  ┌──────────────────┴──────────────────┐
                  ▼                                     ▼
            Sparse Search                         Dense Search
@@ -142,11 +302,20 @@ User prompt ──▶ Intent Classifier ──┐
 
 ```
 
+- **Dense**: fine‑tuned `bge-base-en-v1.5` embeddings
+- **Sparse**: BM25 with tokenization/stop‑word cleanup
+- **Reranking**: weighted blend of semantic + sparse + quality + popularity (+ optional genre overlap)
+- **CE**: `BERT` Cross‑Encoder pairwise reranker
+- **Streaming**: reasons & markdown are delivered as **newline-delimited JSON over SSE**.
+- **Bootstrap & lifespan** — on startup, the backend loads the embedder, BM25 index, CE reranker, Qdrant client, config, and ticket store.
+- **Pipeline / recipe runner** — the FastAPI layer maps each request to a small set of pipeline “recipes” (`interactive`, `for_you_feed`, etc.) that define inputs (query vs. taste), retrieval params, and LLM prompt envelopes, and then invokes the three-agent workflow with the defaults.
+
+
 **Tunable knobs** (with sensible defaults):
 
-- Retrieval depths: `dense_depth=300`, `sparse_depth=20`
+- Retrieval depths: `dense_depth=300`, `sparse_depth=100`
 - Fusion: `rrf_k=60`
-- Metadata weights: `{dense: 0.60, sparse: 0.15, rating: 0.15, popularity: 0.10}`
+- Metadata weights: `{dense=0.56, sparse=0.14, rating=0.14, popularity=0.04, genre=0.12,}`
 - CE window: `meta_ce_top_n=30`
 - Final size: `final_top_k=20`
 
