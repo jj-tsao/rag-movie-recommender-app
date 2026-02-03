@@ -448,32 +448,32 @@ export default function LandingPage() {
   );
 
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-7xl flex-col items-center gap-10 px-4 pb-16 pt-10 text-center sm:px-6 sm:pt-12">
+    <main className="mx-auto flex min-h-[70vh] w-full max-w-7xl flex-col items-center gap-12 px-4 pb-16 pt-14 text-center sm:px-6 sm:pt-16">
       {/* HERO */}
-      <section className="w-full max-w-7xl px-0">
-        <div className="mx-auto flex max-w-3xl flex-col items-center gap-6">
+      <section className="relative w-full max-w-7xl px-0">
+        <div className="mx-auto flex max-w-4xl flex-col items-center gap-8">
           <div className="space-y-4">
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Find your next watch. Personalized to your taste.
+            <h1 className="font-display text-3xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl lg:text-[3.5rem] max-w-3xl mx-auto animate-fade-up">
+              Find your next watch. <br className="hidden md:block" />
+              <span className="opacity-90">Curated to your taste.</span>
             </h1>
-            <p className="text-base text-muted-foreground sm:text-lg">
-              Reelix is your personal AI curator. It learns your taste and
-              brings you films you’ll actually love.
+            <p className="text-base text-muted-foreground sm:text-lg animate-fade-up delay-100">
+              Your personal AI curator. Reelix understands your taste and brings you films you'll genuinely love.
             </p>
           </div>
 
-          <div className="w-full max-w-2xl space-y-3">
+          <div className="w-full max-w-2xl space-y-2 animate-fade-up delay-200">
             <form onSubmit={handleExploreSubmit} role="search" className="w-full">
               <label className="sr-only" htmlFor="landing-vibe-input">
                 Explore
               </label>
-              <div className="flex w-full items-center gap-2 rounded-full border border-border/70 bg-background/90 px-4 py-3 shadow-inner transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+              <div className="flex w-full items-center gap-2 rounded-full border border-gold/20 bg-background/90 px-4 py-3 shadow-inner transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
                 <input
                   id="landing-vibe-input"
                   type="text"
                   value={vibe}
                   onChange={(e) => setVibe(e.target.value)}
-                  placeholder="Describe a vibe or tap an example to jumpstart your picks."
+                  placeholder="Tell Reelix a mood, vibe, or cinematic style..."
                   className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
                   aria-label="Explore by vibe"
                   autoComplete="off"
@@ -506,7 +506,7 @@ export default function LandingPage() {
             </form>
 
             <div
-              className="flex flex-wrap items-center justify-center gap-2"
+              className="flex flex-wrap items-center justify-center gap-2 animate-fade-in delay-300"
               aria-live="polite"
               id="landing-chip-list"
             >
@@ -544,62 +544,60 @@ export default function LandingPage() {
       </section>
 
       {/* RECOMMENDATION TEASER */}
-      <section className="w-full max-w-7xl space-y-6 px-0 text-left">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Here’s how recommendations look.
+      <section className="w-full max-w-7xl space-y-6 px-0 pt-2 text-left">
+        <div className="text-center animate-fade-up delay-400">
+          <h2 className="font-display text-3xl font-semibold leading-tight text-foreground sm:text-4xl">
+            Here's how recommendations read.
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Each pick comes with a short note on why it matches your taste and
-            vibe.
+          <p className="mt-2 text-muted-foreground">
+            Each pick comes with a short curator's note on why it fits your taste.
           </p>
         </div>
         <div className="flex flex-col gap-4">
-          {teaserMovies.map((movie) => {
+          {teaserMovies.map((movie, index) => {
             const key = String(movie.mediaId);
             const watchlistEntry = watchlistState[key];
+            const delays = ["delay-500", "delay-600", "delay-600"];
+            const animationDelay = delays[index] || "delay-600";
             return (
-              <MovieCard
-                key={key}
-                movie={movie}
-                feedback={{
-                  value: feedbackById[key],
-                  disabled: pendingFeedback[key] ?? false,
-                  onChange: (value) => handleFeedback(movie, value),
-                }}
-                watchlist={{
-                  state: watchlistEntry?.state ?? "not_added",
-                  status: watchlistEntry?.status ?? null,
-                  rating: watchlistEntry?.rating ?? null,
-                  busy: watchlistEntry?.busy ?? false,
-                  onAdd: () => handleWatchlistAdd(movie),
-                  onSelectStatus: (status: WatchlistStatus) =>
-                    handleWatchlistStatus(movie, status),
-                  onRemove: () => handleWatchlistRemove(movie),
-                }}
-                layout="wide"
-              />
+              <div key={key} className={`animate-fade-up ${animationDelay}`}>
+                <MovieCard
+                  movie={movie}
+                  feedback={{
+                    value: feedbackById[key],
+                    disabled: pendingFeedback[key] ?? false,
+                    onChange: (value) => handleFeedback(movie, value),
+                  }}
+                  watchlist={{
+                    state: watchlistEntry?.state ?? "not_added",
+                    status: watchlistEntry?.status ?? null,
+                    rating: watchlistEntry?.rating ?? null,
+                    busy: watchlistEntry?.busy ?? false,
+                    onAdd: () => handleWatchlistAdd(movie),
+                    onSelectStatus: (status: WatchlistStatus) =>
+                      handleWatchlistStatus(movie, status),
+                    onRemove: () => handleWatchlistRemove(movie),
+                  }}
+                  layout="wide"
+                />
+              </div>
             );
           })}
         </div>
-        <div className="mt-12 w-full self-stretch rounded-3xl bg-background/90 p-8 text-center shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur sm:p-10">
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex flex-col items-center gap-3">
-              <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                Ready to build your own feed?
-              </p>
-              <button
-                type="button"
-                onClick={handleBuildTaste}
-                className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                Personalize my feed
-              </button>
-              <span className="text-xs text-muted-foreground">
-                Takes under a minute. Get a personal feed instantly.
-              </span>
-            </div>
-          </div>
+        <div className="flex flex-col items-center gap-4 pt-8 text-center animate-fade-in delay-600">
+          <p className="font-display text-2xl font-semibold text-foreground sm:text-3xl">
+            Want a personalized feed?
+          </p>
+          <button
+            type="button"
+            onClick={handleBuildTaste}
+            className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-3.5 text-base font-medium text-primary-foreground shadow-lg transition-all hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(197,165,114,0.5)] hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Customize my feed
+          </button>
+          <span className="text-sm text-muted-foreground">
+            Tell Reelix what you like. Build your feed in ~1 minute.
+          </span>
         </div>
       </section>
     </main>

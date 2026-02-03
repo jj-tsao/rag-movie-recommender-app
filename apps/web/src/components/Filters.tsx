@@ -3,6 +3,7 @@ import type { FilterSettings } from "../types/types";
 import MultiSelectDropdown from "./MultiSelectDropdown";
 import YearRangeSlider from "./YearRangeSlider";
 import { getProviderIdByName } from "@/data/watchProviders";
+import { YEAR_RANGE_MAX, YEAR_RANGE_MIN } from "@/utils/yearRange";
 
 type Props = {
   filters: FilterSettings;
@@ -96,8 +97,8 @@ export default function Filters({ filters, setFilters }: Props) {
 
       <div className="w-full px-1">
         <YearRangeSlider
-          min={1970}
-          max={2025}
+          min={YEAR_RANGE_MIN}
+          max={YEAR_RANGE_MAX}
           values={filters.year_range}
           onChange={(range: [number, number]) =>
             setFilters((f) => ({ ...f, year_range: range }))

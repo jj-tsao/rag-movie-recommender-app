@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/api";
+import { getResponseErrorMessage } from "@/lib/errors";
 
 export interface TasteProfileHttpError extends Error {
   status?: number;
@@ -23,13 +24,9 @@ export async function hasTasteProfile(token: string): Promise<boolean> {
   }
 
   if (!response.ok) {
-    let detail: string | null = null;
-    try {
-      detail = await response.text();
-    } catch (error) {
-      void error;
-    }
-    const error: TasteProfileHttpError = new Error(detail || `Taste profile check failed (${response.status})`);
+    const error: TasteProfileHttpError = new Error(
+      getResponseErrorMessage(response, `Taste profile check failed (${response.status})`)
+    );
     error.status = response.status;
     throw error;
   }

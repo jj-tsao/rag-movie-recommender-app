@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import YearRangeSlider from "@/components/YearRangeSlider";
+import { YEAR_RANGE_MAX, YEAR_RANGE_MIN } from "@/utils/yearRange";
 
 interface Props {
   value: [number, number] | null;
@@ -9,7 +10,12 @@ interface Props {
   max?: number;
 }
 
-export default function YearRangeFilterChip({ value, onApply, min = 1970, max = 2025 }: Props) {
+export default function YearRangeFilterChip({
+  value,
+  onApply,
+  min = YEAR_RANGE_MIN,
+  max = YEAR_RANGE_MAX,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<[number, number]>(value ?? [min, max]);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -89,7 +95,7 @@ export default function YearRangeFilterChip({ value, onApply, min = 1970, max = 
         type="button"
         variant="outline"
         size="sm"
-        className="h-auto rounded-full border-border bg-background px-3 py-1.5 text-sm shadow-xs"
+        className="h-auto rounded-full border-gold/20 bg-background px-3 py-1.5 text-sm shadow-xs transition-all hover:border-gold/40 hover:shadow-md focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/50"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={label === "Years" ? "Filter by years: all years" : `Filter by years: ${label}`}
@@ -103,7 +109,7 @@ export default function YearRangeFilterChip({ value, onApply, min = 1970, max = 
       </Button>
 
       {open ? (
-        <div className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background shadow-xl">
+        <div className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-gold/30 bg-background shadow-xl">
           <div className="p-4">
             <YearRangeSlider min={min} max={max} values={pending} onChange={setPending} />
           </div>

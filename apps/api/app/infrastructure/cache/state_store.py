@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Any, Callable
 
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
 JsonObj = dict[str, Any]
 
@@ -94,10 +95,17 @@ class StateStore:
     # ----- helpers -----
 
     async def _touch(self, key: str, ttl_sec: int) -> None:
-        await self._r.expire(key, int(ttl_sec))
+        try:
+            await self._r.expire(key, int(ttl_sec))
+        except (RedisError, RuntimeError):
+            # Redis hiccup shouldn't fail a request.
+            return
 
     async def _delete(self, key: str) -> None:
-        await self._r.delete(key)
+        try:
+            await self._r.delete(key)
+        except (RedisError, RuntimeError):
+            return
 
     def _expired(self, created_at: float, cap_sec: int) -> bool:
         return bool(cap_sec and created_at and (self._now() - created_at) > cap_sec)
@@ -115,9 +123,12 @@ class StateStore:
         payload["__kind"] = "session"
         payload["__created_at"] = float(state.created_at or now)
 
-        await self._r.set(
-            self._session_key(session_id), self._encode(payload), ex=int(ttl_sec)
-        )
+        try:
+            await self._r.set(
+                self._session_key(session_id), self._encode(payload), ex=int(ttl_sec)
+            )
+        except (RedisError, RuntimeError):
+            return
 
     async def get_session(
         self,
@@ -127,7 +138,11 @@ class StateStore:
         ttl_sec: int | None = 24*3600,
     ) -> SessionState | None:
         key = self._session_key(session_id)
-        b = await self._r.get(key)
+        try:
+            b = await self._r.get(key)
+        except (RedisError, RuntimeError):
+            # Treat Redis connection errors as cache misses.
+            return None
         if not b:
             return None
 
@@ -168,7 +183,10 @@ class StateStore:
     ) -> bool:
         """Read-modify-write update (not atomic across processes)."""
         key = self._session_key(session_id)
-        b = await self._r.get(key)
+        try:
+            b = await self._r.get(key)
+        except (RedisError, RuntimeError):
+            return False
         if not b:
             return False
 
@@ -189,6 +207,9 @@ class StateStore:
         payload.setdefault("__kind", "session")
         payload.setdefault("__created_at", created_at or self._now())
         
-        await self._r.set(key, self._encode(payload), ex=int(ttl_sec))
+        try:
+            await self._r.set(key, self._encode(payload), ex=int(ttl_sec))
+        except (RedisError, RuntimeError):
+            return False
         
         return True

@@ -647,7 +647,8 @@ export default function ForYouPage() {
     }
     if (event.type === "error") {
       const message = typeof event.data?.message === "string" ? event.data.message : "Stream error";
-      setStreamState({ status: "error", message });
+      const errorId = typeof event.data?.error_id === "string" ? event.data.error_id : null;
+      setStreamState({ status: "error", message: errorId ? `${message} (Ref ${errorId})` : message });
       setCards((prev) => finalizePending(prev));
     }
   }, []);
@@ -1285,7 +1286,7 @@ export default function ForYouPage() {
   return (
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-24 pt-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">For You</h1>
+        <h1 className="font-display text-3xl font-bold leading-tight text-foreground sm:text-4xl">For You</h1>
         <p className="text-sm text-muted-foreground">
           Fresh picks tailored to your taste. Updated live as our agent reasons in real time.
         </p>
@@ -1340,7 +1341,7 @@ export default function ForYouPage() {
       )}
 
       {orderedCards.length > 0 && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 animate-fade-in">
           {orderedCards.map((cardData) => {
             const { mediaId, ...movieCard } = cardData;
             const entry = mediaId ? watchlistState[mediaId] : undefined;

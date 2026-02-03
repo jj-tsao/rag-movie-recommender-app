@@ -74,6 +74,7 @@ class AgentRecRunner:
             sparse_vec=sparse_vec,
             qfilter=qfilter,
             user_context=user_context,
+            mentioned_titles=spec.seed_titles if spec.seed_titles else None,
             **pipeline_params,
         )
 
@@ -107,7 +108,7 @@ class AgentRecRunner:
 
     def _build_pipeline_params(self, spec: RecQuerySpec) -> dict:
         return dict(
-            final_top_k=15,
+            final_top_k=12,
             weights=dict(
                 dense=0.60, sparse=0.08, rating=0.20, popularity=0.08, genre=0.00, recency=0.04
             ),

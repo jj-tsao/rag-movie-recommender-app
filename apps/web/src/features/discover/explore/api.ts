@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/api";
+import { getResponseErrorMessage } from "@/lib/errors";
 import { getSupabaseAccessToken } from "@/lib/session";
 import type { DeviceInfo } from "@/types/types";
 import { normalizeTomatoScore } from "../for_you/api";
@@ -56,7 +57,7 @@ export interface ExploreRecsResponse {
   mode: "RECS";
   opening?: string | null;
   items: ExploreItem[];
-  stream_url?: string | null;
+  why_url?: string | null;
   active_spec?: ActiveSpecEnvelope | null;
 }
 
@@ -109,7 +110,7 @@ export type ExploreStreamEvent =
       data: {
         query_id: string;
         items: ExploreItem[];
-        stream_url?: string | null;
+        why_url?: string | null;
         curator_opening?: string | null;
       };
     }
@@ -155,8 +156,9 @@ export async function streamExplore({
   });
 
   if (!response.ok) {
-    const detail = await safeReadText(response);
-    throw new Error(detail || `Explore request failed (${response.status})`);
+    throw new Error(
+      getResponseErrorMessage(response, `Explore request failed (${response.status})`)
+    );
   }
 
   const body = response.body;
@@ -222,8 +224,9 @@ export async function rerunExplore({
   });
 
   if (!response.ok) {
-    const detail = await safeReadText(response);
-    throw new Error(detail || `Explore rerun failed (${response.status})`);
+    throw new Error(
+      getResponseErrorMessage(response, `Explore rerun failed (${response.status})`)
+    );
   }
 
   const payload = (await response.json()) as ExploreRecsResponse;
@@ -236,7 +239,10 @@ export async function rerunExplore({
     mode: "RECS",
     opening: payload.opening ?? "",
     items: payload.items,
-    stream_url: payload.stream_url ?? null,
+    why_url:
+      payload.why_url ??
+      (payload as { stream_url?: string | null }).stream_url ??
+      null,
     active_spec: payload.active_spec ?? null,
   };
 }
@@ -263,8 +269,9 @@ export async function streamExploreWhy({
   });
 
   if (!response.ok) {
-    const detail = await safeReadText(response);
-    throw new Error(detail || `Explore why stream failed (${response.status})`);
+    throw new Error(
+      getResponseErrorMessage(response, `Explore why stream failed (${response.status})`)
+    );
   }
 
   const body = response.body;
@@ -364,8 +371,12 @@ function parseExploreSseEvent(raw: string): ExploreStreamEvent | null {
       const queryId = typeof json?.query_id === "string" ? json.query_id : null;
       if (!queryId) return null;
       const items = Array.isArray(json?.items) ? (json.items as ExploreItem[]) : [];
-      const streamUrl =
-        typeof json?.stream_url === "string" ? json.stream_url : null;
+      const whyUrl =
+        typeof json?.why_url === "string"
+          ? json.why_url
+          : typeof json?.stream_url === "string"
+            ? json.stream_url
+            : null;
       const curatorOpening =
         typeof json?.curator_opening === "string" ? json.curator_opening : null;
       return {
@@ -373,7 +384,7 @@ function parseExploreSseEvent(raw: string): ExploreStreamEvent | null {
         data: {
           query_id: queryId,
           items,
-          stream_url: streamUrl,
+          why_url: whyUrl,
           curator_opening: curatorOpening,
         },
       };
@@ -426,15 +437,6 @@ function safeJsonParse<T>(value: string): T | null {
   }
 }
 
-async function safeReadText(response: Response): Promise<string | null> {
-  try {
-    return await response.text();
-  } catch (error) {
-    void error;
-    return null;
-  }
-}
-
 function toMediaId(value: unknown): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);
@@ -478,4 +480,39 @@ function toOptionalNumber(value: unknown): number | undefined {
     if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
+}
+
+export async function logExploreFinalRecs({
+  queryId,
+  mediaType,
+  finalRecs,
+}: {
+  queryId: string;
+  mediaType: "movie" | "tv";
+  finalRecs: {
+    media_id: number;
+    why: string;
+    imdb_rating?: number | null;
+    rt_rating?: number | null;
+    why_source: "cache" | "llm";
+  }[];
+}): Promise<void> {
+  const token = await getSupabaseAccessToken();
+  const response = await fetch(`${BASE_URL}/discovery/telemetry/final_recs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      query_id: queryId,
+      media_type: mediaType,
+      final_recs: finalRecs,
+      endpoint: "discovery/explore",
+    }),
+  });
+
+  if (!response.ok) {
+    console.warn("Failed to log explore final recs");
+  }
 }

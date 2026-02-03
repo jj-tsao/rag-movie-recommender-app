@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+import re
 import time
 from reelix_core.types import UserTasteContext
 from reelix_ranking.rrf import rrf
@@ -9,6 +10,35 @@ from reelix_ranking.diversification import diversify_by_collection
 from reelix_retrieval.base_retriever import BaseRetriever
 from qdrant_client.models import Filter as QFilter
 from concurrent.futures import ThreadPoolExecutor
+
+
+def _normalize_title(title: str) -> str:
+    """Normalize title for comparison (lowercase, no punctuation)."""
+    title = title.lower()
+    title = re.sub(r'[^\w\s]', '', title)  # Remove punctuation
+    title = re.sub(r'\s+', ' ', title)     # Normalize whitespace
+    return title.strip()
+
+
+def _filter_mentioned_titles(
+    candidates: List[Candidate],
+    mentioned_titles: List[str],
+) -> List[Candidate]:
+    """Filter out candidates whose titles match mentioned_titles (case-insensitive)."""
+    if not mentioned_titles:
+        return candidates
+
+    normalized_mentioned = {_normalize_title(t) for t in mentioned_titles}
+
+    filtered = []
+    for candidate in candidates:
+        title = candidate.payload.get("title", "")
+        if _normalize_title(title) not in normalized_mentioned:
+            filtered.append(candidate)
+        else:
+            print(f"[Pipeline] Filtered mentioned title: {title}")
+
+    return filtered
 
 
 class RecommendPipeline:
@@ -44,6 +74,7 @@ class RecommendPipeline:
             dense=0.60, sparse=0.10, rating=0.20, popularity=0.10, genre=0.00
         ),
         final_top_k: int = 20,
+        mentioned_titles: List[str] | None = None,
     ) -> Tuple[List[Candidate], Dict[int, ScoreTrace]]:
         total_start = time.perf_counter()
         # 1) retrieve - parallelize Qdrant searches to reduce network latency
@@ -74,6 +105,11 @@ class RecommendPipeline:
         from reelix_retrieval.pooling import merge_by_id
 
         pool = merge_by_id(dense, sparse, pool_ids)
+
+        # 3.5) Filter mentioned titles before reranking
+        if mentioned_titles:
+            pool = _filter_mentioned_titles(pool, mentioned_titles)
+            print(f"[Pipeline] After filtering mentioned titles: {len(pool)} candidates")
 
         # 4) metadata rerank
         meta_start = time.perf_counter()

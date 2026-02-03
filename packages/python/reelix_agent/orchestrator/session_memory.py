@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from reelix_agent.core.types import AgentMode, InteractiveAgentResult, RecQuerySpec
+from reelix_agent.core.types import AgentMode, RecAgentResult, RecQuerySpec
 
 JsonObj = dict[str, Any]
 
@@ -51,7 +51,7 @@ def _build_slot_map(final_recs: list) -> tuple[JsonObj, list[int]]:
     return slot_map, seen
 
 
-def _summary_delta_from_spec(result: InteractiveAgentResult) -> JsonObj:
+def _summary_delta_from_spec(result: RecAgentResult) -> JsonObj:
     """
     Keep this SMALL and “sticky”. Avoid copying the entire spec.
     """
@@ -90,7 +90,7 @@ def _summary_delta_from_spec(result: InteractiveAgentResult) -> JsonObj:
     return delta
 
 
-def build_turn_memory_delta(result: InteractiveAgentResult) -> MemoryDelta:
+def build_turn_memory_delta(result: RecAgentResult) -> MemoryDelta:
     """
     Deterministic: memory derived from the agent’s output.
     """

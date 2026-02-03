@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/api";
+import { getResponseErrorMessage } from "@/lib/errors";
 import { getSupabaseAccessToken } from "@/lib/session";
 
 export type WatchlistStatus = "want" | "watched";
@@ -86,8 +87,7 @@ export async function lookupWatchlistKeys(keys: WatchlistLookupKey[]): Promise<W
   });
 
   if (!response.ok) {
-    const message = await safeReadText(response);
-    throw new Error(message || "Failed to check watchlist state.");
+    throw new Error(getResponseErrorMessage(response, "Failed to check watchlist state."));
   }
 
   return (await response.json()) as WatchlistLookupResult[];
@@ -113,8 +113,7 @@ export async function createWatchlistItem(payload: WatchlistCreateInput): Promis
   });
 
   if (!response.ok) {
-    const message = await safeReadText(response);
-    throw new Error(message || "Could not add to watchlist.");
+    throw new Error(getResponseErrorMessage(response, "Could not add to watchlist."));
   }
 
   return (await response.json()) as WatchlistItemResponse;
@@ -155,8 +154,9 @@ export async function fetchWatchlist({
   });
 
   if (!response.ok) {
-    const message = await safeReadText(response);
-    throw new Error(message || `Failed to load watchlist (${response.status})`);
+    throw new Error(
+      getResponseErrorMessage(response, `Failed to load watchlist (${response.status})`)
+    );
   }
 
   return (await response.json()) as WatchlistListResponse;
@@ -186,8 +186,7 @@ export async function updateWatchlist(id: string, payload: WatchlistUpdatePayloa
   });
 
   if (!response.ok) {
-    const message = await safeReadText(response);
-    throw new Error(message || "Could not update watchlist.");
+    throw new Error(getResponseErrorMessage(response, "Could not update watchlist."));
   }
 
   return (await response.json()) as WatchlistItemResponse;
@@ -207,16 +206,6 @@ export async function deleteWatchlistItem(id: string): Promise<void> {
   });
 
   if (!response.ok) {
-    const message = await safeReadText(response);
-    throw new Error(message || "Could not remove from watchlist.");
-  }
-}
-
-async function safeReadText(response: Response): Promise<string | null> {
-  try {
-    return await response.text();
-  } catch (error) {
-    void error;
-    return null;
+    throw new Error(getResponseErrorMessage(response, "Could not remove from watchlist."));
   }
 }

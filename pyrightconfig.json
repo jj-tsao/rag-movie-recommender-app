@@ -2,6 +2,7 @@
   "venvPath": "apps/api",
   "venv": ".venv",
   "extraPaths": [
+    "apps/api",
     "packages/python"
   ]
 }

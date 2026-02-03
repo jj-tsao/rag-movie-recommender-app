@@ -28,6 +28,63 @@ class FinalRec(BaseModel):
     why: str
 
 
+class CuratorEvalLog(BaseModel):
+    """
+    Data for logging a single curator evaluation.
+    """
+
+    query_id: str
+    media_id: int
+    media_type: str
+    title: str | None = None
+    genre_fit: int | None = None
+    tone_fit: int | None = None
+    structure_fit: int | None = None
+    theme_fit: int | None = None
+    total_fit: int | None = None
+    tier: str | None = None  # strong_match, moderate_match, no_match
+    is_served: bool = False
+    final_rank: int | None = None
+
+
+class TierSummaryLog(BaseModel):
+    """Data for logging tier summary statistics."""
+
+    query_id: str
+    total_candidates: int
+    strong_count: int
+    moderate_count: int
+    no_match_count: int
+    served_count: int
+    selection_rule: str | None = None
+    curator_latency_ms: int | None = None
+    tier_latency_ms: int | None = None
+
+
+class AgentDecisionLog(BaseModel):
+    """Data for logging orchestrator agent decisions."""
+
+    query_id: str
+    session_id: str
+    user_id: str | None = None
+    turn_number: int = 1
+
+    # Decision
+    mode: str  # "CHAT" or "RECS"
+    decision_reasoning: str | None = None
+    tool_called: str | None = None
+
+    # Spec (if RECS mode)
+    spec_json: dict | None = None
+    opening_summary: str | None = None
+
+    # Performance
+    planning_latency_ms: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    model: str | None = None
+
+
 # ---------- Core logger ----------
 class TelemetryLogger:
     """
@@ -50,14 +107,14 @@ class TelemetryLogger:
         self,
         supabase_url: str,
         api_key: str,
-        client,
+        client: httpx.AsyncClient,
         *,
         sample: float = 1.0,
         timeout_s: float = 5.0,
     ):
         self.supabase_url = supabase_url.rstrip("/")
         self.api_key = api_key
-        self.client = client
+        self._http_client = client  # Shared async HTTP client for all log calls
         self.sample = float(max(0.0, min(1.0, sample)))
         self.timeout_s = timeout_s
 
@@ -73,12 +130,13 @@ class TelemetryLogger:
         }
 
     async def _post(
-        self, client: httpx.AsyncClient, path: str, payload: list[dict[str, Any]]
+        self, path: str, payload: list[dict[str, Any]]
     ) -> None:
+        """Post payload to Supabase using shared HTTP client."""
         if not self._enabled() or not payload:
             return
         try:
-            r = await client.post(
+            r = await self._http_client.post(
                 f"{self.supabase_url}/rest/v1/{path}",
                 headers=self._headers(),
                 json=payload,
@@ -137,8 +195,7 @@ class TelemetryLogger:
         if query_filters:
             row["query_filters"] = self.to_jsonable(query_filters)
 
-        async with httpx.AsyncClient() as client:
-            await self._post(client, "rec_queries", [row])
+        await self._post("rec_queries", [row])
 
     async def log_candidates(
         self,
@@ -177,8 +234,7 @@ class TelemetryLogger:
             rows.append(row)
         if not rows:
             return
-        async with httpx.AsyncClient() as client:
-            await self._post(client, "rec_results", rows)
+        await self._post("rec_results", rows)
 
     async def log_why(
         self,
@@ -204,8 +260,7 @@ class TelemetryLogger:
             rows.append(row)
         if not rows:
             return
-        async with httpx.AsyncClient() as client:
-            await self._post(client, "rec_results?on_conflict=endpoint,query_id,media_id", rows)
+        await self._post("rec_results?on_conflict=endpoint,query_id,media_id", rows)
 
     def start_stream(
         self, *, endpoint: Endpoint, query_id: str, batch_id: int | None
@@ -237,8 +292,91 @@ class TelemetryLogger:
             row["device_type"] = data.get("device_type")
             row["platform"] = data.get("platform")
             row["user_agent"] = data.get("user_agent")
-        async with httpx.AsyncClient() as client:
-            await self._post(client, "rec_client_sessions", [row])
+        await self._post("rec_client_sessions", [row])
+
+    async def log_curator_evaluations(
+        self,
+        evals: list[CuratorEvalLog],
+    ) -> None:
+        """
+        Insert curator evaluation rows into curator_evaluations table.
+        Logs per-candidate LLM evaluation scores and tier assignments.
+        """
+        if not self._enabled() or not evals:
+            return
+
+        rows = []
+        for e in evals:
+            row = {
+                "query_id": e.query_id,
+                "media_id": e.media_id,
+                "media_type": e.media_type,
+                "title": e.title,
+                "genre_fit": e.genre_fit,
+                "tone_fit": e.tone_fit,
+                "structure_fit": e.structure_fit,
+                "theme_fit": e.theme_fit,
+                "total_fit": e.total_fit,
+                "tier": e.tier,
+                "is_served": e.is_served,
+                "final_rank": e.final_rank,
+            }
+            rows.append(row)
+
+        await self._post("curator_evaluations", rows)
+
+    async def log_tier_summary(
+        self,
+        summary: TierSummaryLog,
+    ) -> None:
+        """
+        Insert tier summary statistics into tier_summaries table.
+        One row per query capturing aggregate tier stats.
+        """
+        if not self._enabled():
+            return
+
+        row = {
+            "query_id": summary.query_id,
+            "total_candidates": summary.total_candidates,
+            "strong_count": summary.strong_count,
+            "moderate_count": summary.moderate_count,
+            "no_match_count": summary.no_match_count,
+            "served_count": summary.served_count,
+            "selection_rule": summary.selection_rule,
+            "curator_latency_ms": summary.curator_latency_ms,
+            "tier_latency_ms": summary.tier_latency_ms,
+        }
+
+        await self._post("tier_summaries", [row])
+
+    async def log_agent_decision(
+        self,
+        decision: AgentDecisionLog,
+    ) -> None:
+        """
+        Insert orchestrator agent decision into agent_decisions table. Logs mode routing, spec generation, and LLM usage.
+        """
+        if not self._enabled():
+            return
+
+        row = {
+            "query_id": decision.query_id,
+            "session_id": decision.session_id,
+            "user_id": decision.user_id,
+            "turn_number": decision.turn_number,
+            "mode": decision.mode,
+            "decision_reasoning": decision.decision_reasoning,
+            "tool_called": decision.tool_called,
+            "spec_json": self.to_jsonable(decision.spec_json) if decision.spec_json else None,
+            "opening_summary": decision.opening_summary,
+            "planning_latency_ms": decision.planning_latency_ms,
+            "input_tokens": decision.input_tokens,
+            "output_tokens": decision.output_tokens,
+            "model": decision.model,
+        }
+
+        await self._post("agent_decisions", [row])
 
 
 # ---------- SSE stream aggregator ----------
@@ -316,5 +454,4 @@ class StreamAggregator:
     async def _write(self, rows: list[dict[str, Any]]) -> None:
         if not self.logger._enabled() or not rows:
             return
-        async with httpx.AsyncClient() as client:
-            await self.logger._post(client, "rec_stream_events", rows)
+        await self.logger._post("rec_stream_events", rows)

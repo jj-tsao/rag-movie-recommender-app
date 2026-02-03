@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/api";
+import { getResponseErrorMessage } from "@/lib/errors";
 import { getSupabaseAccessToken } from "@/lib/session";
 
 export interface DiscoverInitialItem {
@@ -92,8 +93,9 @@ export async function fetchDiscoverInitial(
   });
 
   if (!response.ok) {
-    const detail = await safeReadText(response);
-    throw new Error(detail || `Discover request failed (${response.status})`);
+    throw new Error(
+      getResponseErrorMessage(response, `Discover request failed (${response.status})`)
+    );
   }
 
   const payload = (await response.json()) as DiscoverInitialResponse;
@@ -125,8 +127,9 @@ export async function streamDiscoverWhy({
   });
 
   if (!response.ok) {
-    const detail = await safeReadText(response);
-    throw new Error(detail || `Stream failed (${response.status})`);
+    throw new Error(
+      getResponseErrorMessage(response, `Stream failed (${response.status})`)
+    );
   }
 
   const body = response.body;
@@ -180,7 +183,7 @@ export async function logDiscoverFinalRecs({
   }[];
 }): Promise<void> {
   const token = await getSupabaseAccessToken();
-  const response = await fetch(`${BASE_URL}/discovery/log/final_recs`, {
+  const response = await fetch(`${BASE_URL}/discovery/telemetry/final_recs`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -190,20 +193,12 @@ export async function logDiscoverFinalRecs({
       query_id: queryId,
       media_type: mediaType,
       final_recs: finalRecs,
+      endpoint: "discovery/for-you",
     }),
   });
 
   if (!response.ok) {
     console.warn("Failed to log discovery final recs");
-  }
-}
-
-async function safeReadText(response: Response): Promise<string | null> {
-  try {
-    return await response.text();
-  } catch (error) {
-    void error;
-    return null;
   }
 }
 

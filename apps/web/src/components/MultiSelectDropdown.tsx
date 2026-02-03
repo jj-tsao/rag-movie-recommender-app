@@ -78,7 +78,7 @@ export default function MultiSelectDropdown({
           {options.map((option) => (
             <label
               key={option}
-              className="flex items-center px-3 py-2 hover:bg-muted cursor-pointer t text-sm font-sans"
+              className="flex items-center px-3 py-2 hover:bg-muted cursor-pointer text-sm"
             >
               <input
                 type="checkbox"

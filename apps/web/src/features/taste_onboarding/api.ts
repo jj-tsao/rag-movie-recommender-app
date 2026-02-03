@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/api";
+import { getResponseErrorMessage } from "@/lib/errors";
 import { getSupabaseAccessToken } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { getSessionId } from "@/utils/session";
@@ -26,8 +27,7 @@ export async function upsertUserPreferences(payload: {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || "Failed to save preferences");
+    throw new Error(getResponseErrorMessage(response, "Failed to save preferences"));
   }
 }
 
@@ -218,8 +218,7 @@ export async function logUserRecReaction({
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || "Failed to log reaction");
+    throw new Error(getResponseErrorMessage(response, "Failed to log reaction"));
   }
 }
 

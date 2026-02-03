@@ -79,6 +79,7 @@ class FinalRecsRequest(BaseModel):
     query_id: str
     media_type: MediaType
     final_recs: List[FinalRec]
+    endpoint: str  # "discovery/for-you", "discovery/explore", etc.
 
 
 class TasteProfileExistsOut(TasteProfileMeta):

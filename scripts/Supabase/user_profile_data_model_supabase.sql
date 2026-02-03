@@ -106,7 +106,7 @@ create trigger user_subscriptions_updated_at
 before update on public.user_subscriptions
 for each row execute procedure public.tg_set_updated_at();
 
--- Interactions (allow upsert per (user, media, type, source))
+-- Interactions (insert only)
 create table if not exists public.user_interactions (
   interaction_id bigserial primary key,
   user_id        uuid not null references public.app_user(user_id) on delete cascade,
@@ -114,25 +114,21 @@ create table if not exists public.user_interactions (
   media_id        bigint not null,
   title           text not null,
   event_type     text not null check (event_type in (
-                    'view','finish', 'love', 'like','dislike','save','dismiss',
-                    'search','click','hover','trailer_view','provider_open')),
-  weight         real default 1.0,
+                    'impression','rec_reaction', 'add_to_watchlist', 'remove_from_watchlist','mark_watched','rating','dismiss',
+                    'trailer_view','dismiss','share','subs_update','settings_change')),
+  value          real default 0.0,
+  position       int default 0.0,
+  source         text not null default 'in_product' check (source in ('taste_onboarding','for_you_feed','in_product','vibe_query','other')),
+  query_id       str,
+  session_id     str,
   context_json   jsonb default '{}'::jsonb,
-  source         text not null default 'in_product' check (source in ('taste_onboarding','for_you_feed','in_product','feedback','agent','other')),
   occurred_at    timestamptz default now()
+  weight         real default 1.0,
 );
 create index if not exists idx_ui_user_time on public.user_interactions(user_id, occurred_at desc);
 create index if not exists idx_ui_user_media on public.user_interactions(user_id, media_id);
 create index if not exists idx_ui_event on public.user_interactions(event_type);
 create index if not exists user_interactions_source_idx on public.user_interactions (source);
-
--- Idempotency: ensure one row per (user, media, type, source)
-select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.user_interactions'::regclass and contype='u';
-
-alter table public.user_interactions
-add constraint user_interactions_user_media_source_uniq
-unique (user_id, media_id, media_type, source);
-
 
 --  user_settings
 create table if not exists public.user_settings (

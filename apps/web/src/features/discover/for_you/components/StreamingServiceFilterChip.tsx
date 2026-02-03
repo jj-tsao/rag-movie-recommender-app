@@ -105,7 +105,7 @@ export default function StreamingServiceFilterChip({ selected, onApply }: Props)
         type="button"
         variant="outline"
         size="sm"
-        className="h-auto rounded-full border-border bg-background px-3 py-1.5 text-sm shadow-xs"
+        className="h-auto rounded-full border-gold/20 bg-background px-3 py-1.5 text-sm shadow-xs transition-all hover:border-gold/40 hover:shadow-md focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/50"
         onClick={() => setOpen((openState) => !openState)}
         aria-expanded={open}
         aria-label={
@@ -134,7 +134,7 @@ export default function StreamingServiceFilterChip({ selected, onApply }: Props)
       </Button>
 
       {open ? (
-        <div className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-background shadow-xl">
+        <div className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-gold/30 bg-background shadow-xl">
           <div className="max-h-[320px] overflow-y-auto py-2 scrollbar-styled">
             <FilterRow
               label="All services"
@@ -195,12 +195,12 @@ function FilterRow({
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-3 px-4 py-2 text-left transition-colors",
-        selected ? "bg-primary/10 text-foreground" : "hover:bg-muted/60 text-foreground",
+        selected ? "bg-gold/10 text-foreground" : "hover:bg-muted/60 text-foreground",
       )}
     >
       {children}
       <span className="flex-1 text-sm">{label}</span>
-      {selected ? <Check className="size-4 text-primary" /> : null}
+      {selected ? <Check className="size-4 text-gold" /> : null}
     </button>
   );
 }

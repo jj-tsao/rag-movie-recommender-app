@@ -44,8 +44,6 @@ class Settings(BaseSettings):
     ticket_ttl_sec: int = 3600  # 60 min cap
     session_ttl_sec: int = 7 * 24 * 3600  # 7d cap
     why_cache_ttl_sec: int = 14 * 24 * 3600  # 2 weeks cap
-    ticket_ttl_sec: int = 3600  # 60 min absolute cap
-    why_cache_ttl_sec: int = 7 * 24 * 3600
 
     # env config
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -70,6 +68,7 @@ def _init_recommendation_stack(app: FastAPI) -> None:
     from reelix_recommendation.recipes import InteractiveRecipe, ForYouFeedRecipe
     from openai import OpenAI
     from reelix_models.llm_completion import OpenAIChatLLM
+    from reelix_agent.tools import build_registry, ToolRunner
 
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     startup_t0 = time.perf_counter()
@@ -129,6 +128,11 @@ def _init_recommendation_stack(app: FastAPI) -> None:
         "interactive": InteractiveRecipe(query_encoder=app.state.query_encoder),
     }
     app.state.chat_completion_llm = chat_completion_llm
+
+    # == Initialize agent Tool Infrastructure ==
+
+    app.state.tool_registry = build_registry()
+    app.state.tool_runner = ToolRunner(app.state.tool_registry)
 
     # == Initialize Redis stores ==
     redis_clients = make_redis_clients(app.state.settings.redis_url)

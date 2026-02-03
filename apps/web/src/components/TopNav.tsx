@@ -43,27 +43,37 @@ export default function TopNav() {
   async function handleSignOut() {
     const res = await signOut();
     if (!res.ok) {
-      toast({ title: "Sign out failed", description: res.error, variant: "destructive" });
+      console.warn("Sign out failed", res.error);
+      toast({ title: "Sign out failed", description: "Please try again.", variant: "destructive" });
       return;
     }
     toast({ title: "Signed out", description: "See you soon!", variant: "success" });
     navigate("/");
   }
   return (
-    <header className="sticky top-0 z-50 w-full flex items-center justify-between px-1 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-4 border-b border-border bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full flex items-center justify-between px-1 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-4 bg-background/90 backdrop-blur-md shadow-[0_1px_0_0_rgba(197,165,114,0.15)] relative before:absolute before:inset-0 before:pointer-events-none before:opacity-[0.03] before:bg-[url('data:image/svg+xml,%3Csvg viewBox=%270 0 400 400%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter id=%27noiseFilter%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url(%23noiseFilter)%27/%3E%3C/svg%3E')]">
       <div className="flex items-center gap-6">
-        <Link to="/" className="flex items-center space-x-3">
-          <img src="/logo/Reelix_logo_dark.svg" alt="Reelix" className="h-10 w-auto" />
+        <Link to="/" className="flex items-center gap-3 group">
+          <img
+            src="/logo/reelix_double_circle.png"
+            alt="Reelix logo"
+            className="h-14 w-auto transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_0_8px_rgba(197,165,114,0.3)]"
+          />
+          <span className="font-display text-3xl font-bold tracking-tight text-foreground transition-colors group-hover:text-gold-light">
+            Reelix
+          </span>
         </Link>
-        <nav className="hidden sm:flex items-center gap-4 text-sm font-medium text-muted-foreground">
+        <nav className="hidden sm:flex items-center gap-6 text-sm font-medium text-muted-foreground">
           {NAV_ITEMS.map(({ label, to }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 [
-                  "transition-colors hover:text-foreground",
-                  isActive ? "text-foreground font-semibold" : "text-muted-foreground",
+                  "relative transition-colors hover:text-foreground pb-1",
+                  isActive
+                    ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-gold after:rounded-full"
+                    : "text-muted-foreground",
                 ].join(" ")
               }
             >
@@ -76,7 +86,7 @@ export default function TopNav() {
         <div className="sm:hidden relative" ref={mobileNavRef}>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background/80 text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gold/20 bg-gold/8 text-foreground transition-all hover:border-gold/40 hover:bg-gold/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
             onClick={() => setMobileNavOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={mobileNavOpen}
@@ -94,7 +104,7 @@ export default function TopNav() {
           {mobileNavOpen ? (
             <div
               role="menu"
-              className="absolute right-0 mt-2 w-44 rounded-md border bg-background shadow-md overflow-hidden z-50"
+              className="absolute right-0 mt-2 w-44 rounded-md border border-gold/30 bg-background shadow-xl overflow-hidden z-50"
             >
               {NAV_ITEMS.map(({ label, to }) => (
                 <NavLink
@@ -104,8 +114,8 @@ export default function TopNav() {
                   onClick={() => setMobileNavOpen(false)}
                   className={({ isActive }) =>
                     [
-                      "block w-full px-3 py-2 text-sm text-left hover:bg-accent",
-                      isActive ? "text-foreground font-semibold" : "text-muted-foreground",
+                      "block w-full px-3 py-2 text-sm text-left hover:bg-gold/12 transition-colors",
+                      isActive ? "text-foreground bg-gold/10 border-l-2 border-gold" : "text-muted-foreground",
                     ].join(" ")
                   }
                 >
@@ -121,8 +131,8 @@ export default function TopNav() {
             onSignOut={handleSignOut}
           />
         ) : (
-          <Button size="sm" asChild>
-            <Link to="/auth/signin">Sign In</Link>
+          <Button size="sm" asChild className="bg-gold hover:bg-gold-light text-background shadow-sm hover:shadow-md transition-all">
+            <Link to="/auth/signin">My Reelix</Link>
           </Button>
         )}
       </div>
@@ -147,7 +157,7 @@ function UserMenu({ label, onSignOut }: { label: string; onSignOut: () => void }
     <div className="relative" ref={menuRef}>
       <button
         type="button"
-        className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm text-foreground bg-background hover:bg-accent focus-visible:ring-[3px] focus-visible:outline-ring outline-none"
+        className="inline-flex items-center gap-2 rounded-md border border-gold/20 px-3 py-1.5 text-sm text-foreground bg-gold/8 hover:border-gold/40 hover:bg-gold/12 transition-all focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:outline-none outline-none"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -160,11 +170,11 @@ function UserMenu({ label, onSignOut }: { label: string; onSignOut: () => void }
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-44 rounded-md border bg-background shadow-md overflow-hidden z-50"
+          className="absolute right-0 mt-2 w-44 rounded-md border border-gold/30 bg-background shadow-xl overflow-hidden z-50"
         >
           <button
             role="menuitem"
-            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gold/12 transition-colors"
             onClick={() => {
               setOpen(false);
               onSignOut();

@@ -63,36 +63,35 @@ def format_rec_context(candidates: list) -> str:
 def build_curator_user_prompt(
     *, candidates: list, query_text: str, spec: RecQuerySpec, user_signals: UserSignals | None = None
 ):
-    spec_payload: dict[str, object] = {
-        "query_text": spec.query_text,
-        "core_genres": spec.core_genres,
-        "sub_genres": spec.sub_genres,
-        "core_tone": spec.core_tone,
-        "key_themes": spec.key_themes,
-    }
-    
-    spec_json = json.dumps(spec_payload, ensure_ascii=False)
+    spec_payload: dict[str, object] = {}
 
-    context = format_rec_context(candidates=candidates)    
-    
-    user_message = (
-        "Here is the recommendation request:\n"
-        f"{spec_json}\n\n"
-        "Here are the candidate items to evaluate:\n"
-        f"{context}"
-    )
+    # Only include non-empty fields
+    if spec.query_text:
+        spec_payload["query"] = spec.query_text
+    if spec.core_genres:
+        spec_payload["core_genres"] = spec.core_genres
+    if spec.sub_genres:
+        spec_payload["sub_genres"] = spec.sub_genres
+    if spec.core_tone:
+        spec_payload["core_tone"] = spec.core_tone
+    if spec.key_themes:
+        spec_payload["key_themes"] = spec.key_themes
+
+    spec_json = json.dumps(spec_payload, separators=(",", ":"), ensure_ascii=False)
+
+    context = format_rec_context(candidates=candidates)
+
+    # Simplified template to reduce tokens
+    user_message = f"Request:\n{spec_json}\n\nCandidates:\n{context}"
 
     return user_message
 
-CURATOR_PROMPT_S = """
-Score ALL candidates vs user_request. Candidates are JSON objects: {id,t,y,g,k,o}. Use ONLY candidate ids. No prose.
+CURATOR_PROMPT_S = """Score all candidates against request. Candidates: id=media_id, t=title, g=genres, k=keywords, o=overview
 
-For each candidate output 0/1/2:
-genre_fit (absent->0, partial->1, strong->2)
-tone_fit  (conflict->0, mixed->1, strong->2)
-theme_fit (none->0, some->1, central->2)
+Rate each 0-2:
+genre_fit: 0=absent, 1=partial, 2=strong match
+tone_fit: 0=conflicts, 1=mixed, 2=matches
+theme_fit: 0=none, 1=some, 2=central
 Be conservative.
 
-Return exactly:
-{"evaluation_results":[{"media_id":<id>,"genre_fit":0|1|2,"tone_fit":0|1|2,"theme_fit":0|1|2},...]}
-"""
+Output: {"evaluation_results":[{"media_id":ID,"genre_fit":0-2,"tone_fit":0-2,"theme_fit":0-2},...]}"""

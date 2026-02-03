@@ -29,8 +29,10 @@ import {
 import { getSessionId } from "@/utils/session";
 import { getDeviceInfo } from "@/utils/detectDevice";
 import { setExploreRedirectFlag } from "@/utils/exploreRedirect";
+import { DEFAULT_YEAR_RANGE } from "@/utils/yearRange";
 import {
   getAccessToken,
+  logExploreFinalRecs,
   mapToRatings,
   rerunExplore,
   streamExplore,
@@ -61,7 +63,6 @@ interface WatchlistUiState {
 
 const HERO_HELPER_ID = "explore-helper";
 const WATCHLIST_SOURCE = "discovery_explore";
-const DEFAULT_YEAR_RANGE: [number, number] = [1970, 2025];
 const PROVIDER_NAME_BY_ID = new Map<number, string>(
   getStreamingServiceOptions()
     .filter((opt) => typeof opt.id === "number")
@@ -219,13 +220,13 @@ function ExploreSearchForm({
         <label className="sr-only" htmlFor="explore-query-input">
           Describe what you want to watch
         </label>
-        <div className="flex w-full items-center gap-2 rounded-full border border-border/70 bg-background/90 px-4 py-3 shadow-inner transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+        <div className="flex w-full items-center gap-2 rounded-full border border-gold/20 bg-background/90 px-4 py-3 shadow-inner transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
           <input
             id="explore-query-input"
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Describe a vibe or tap an example to jumpstart your picks."
+            placeholder="Tell Reelix a mood, vibe, or cinematic style..."
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
             aria-label="Explore by vibe"
             autoComplete="off"
@@ -331,6 +332,7 @@ export default function ExplorePage() {
   const [selectedYearRange, setSelectedYearRange] = useState<[number, number] | null>(null);
   const [filtersReady, setFiltersReady] = useState(false);
   const queryIdRef = useRef<string | null>(null);
+  const loggedQueryIdRef = useRef<string | null>(null);
   const autoSubmitRef = useRef<string | null>(null);
   const exploreAbortRef = useRef<AbortController | null>(null);
   const whyAbortRef = useRef<AbortController | null>(null);
@@ -493,11 +495,11 @@ export default function ExplorePage() {
   );
 
   const startWhyStream = useCallback(
-    async (streamUrl: string | null | undefined, token: string) => {
+    async (whyUrl: string | null | undefined, token: string) => {
       whyAbortRef.current?.abort();
       whyAbortRef.current = null;
 
-      if (!streamUrl) {
+      if (!whyUrl) {
         setCards((prev) => finalizeWhyLoading(prev));
         setIsWhyStreaming(false);
         return;
@@ -509,7 +511,7 @@ export default function ExplorePage() {
       try {
         await streamExploreWhy({
           token,
-          streamUrl,
+          streamUrl: whyUrl,
           signal: controller.signal,
           onEvent: handleWhyStreamEvent,
         });
@@ -640,7 +642,7 @@ export default function ExplorePage() {
         setHasRecsResponse(true);
         setIsExploreStreaming(false);
         void loadWatchlistState(newOrder);
-        void startWhyStream(event.data.stream_url ?? null, token);
+        void startWhyStream(event.data.why_url ?? null, token);
         return;
       }
 
@@ -658,7 +660,14 @@ export default function ExplorePage() {
           typeof (event.data as { message?: string }).message === "string"
             ? (event.data as { message: string }).message
             : "Could not fetch recommendations right now.";
-        setErrorMessage(message);
+        const errorId =
+          event.data &&
+          typeof event.data === "object" &&
+          "error_id" in event.data &&
+          typeof (event.data as { error_id?: string }).error_id === "string"
+            ? (event.data as { error_id: string }).error_id
+            : null;
+        setErrorMessage(errorId ? `${message} (Ref ${errorId})` : message);
         setPageState("error");
         setIsExploreStreaming(false);
         setIsAwaitingRecs(false);
@@ -675,6 +684,10 @@ export default function ExplorePage() {
     ) => {
       const value = (text ?? query).trim();
       if (!value) return;
+
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
 
       setExploreRedirectFlag();
       exploreAbortRef.current?.abort();
@@ -775,7 +788,7 @@ export default function ExplorePage() {
           mediaId: card.mediaId,
           title: card.title,
           reaction: rating,
-          source: "discovery_explore",
+          source: "vibe_query",
           mediaType: "movie",
           position: ordinal,
           queryId: queryIdRef.current,
@@ -1098,7 +1111,7 @@ export default function ExplorePage() {
         setIsAwaitingRecs(false);
         setHasRecsResponse(true);
         void loadWatchlistState(newOrder);
-        void startWhyStream(response.stream_url, token);
+        void startWhyStream(response.why_url, token);
       } catch (error) {
         setCards(previousCards);
         setOrder(previousOrder);
@@ -1214,6 +1227,63 @@ export default function ExplorePage() {
     };
   }, []);
 
+  // Log final recommendations after why streaming completes
+  useEffect(() => {
+    // Only log when why streaming has finished and we have recs
+    if (isWhyStreaming) return;
+    if (!hasRecsResponse) return;
+    const queryId = queryIdRef.current;
+    if (!queryId) return;
+    if (loggedQueryIdRef.current === queryId) return;
+
+    const finalRecs = orderedCards
+      .map((card) => {
+        const mediaId = toNumericMediaId(card.mediaId);
+        if (mediaId === null) return null;
+        const why = (card.whyMarkdown ?? card.whyText ?? "").trim();
+        if (!why) return null;
+        const whySource: "cache" | "llm" = card.whySource === "cache" ? "cache" : "llm";
+        const imdbRating =
+          typeof card.imdbRating === "number" && Number.isFinite(card.imdbRating)
+            ? card.imdbRating
+            : null;
+        const rtRating =
+          typeof card.rottenTomatoesRating === "number" &&
+          Number.isFinite(card.rottenTomatoesRating)
+            ? Math.round(card.rottenTomatoesRating)
+            : null;
+        return {
+          media_id: mediaId,
+          why,
+          imdb_rating: imdbRating,
+          rt_rating: rtRating,
+          why_source: whySource,
+        };
+      })
+      .filter(
+        (
+          entry
+        ): entry is {
+          media_id: number;
+          why: string;
+          imdb_rating: number | null;
+          rt_rating: number | null;
+          why_source: "cache" | "llm";
+        } => entry !== null
+      );
+
+    if (finalRecs.length === 0) return;
+
+    loggedQueryIdRef.current = queryId;
+    void logExploreFinalRecs({
+      queryId,
+      mediaType: "movie",
+      finalRecs,
+    }).catch((error) => {
+      console.warn("Failed to log explore final recommendations", error);
+    });
+  }, [orderedCards, isWhyStreaming, hasRecsResponse, toNumericMediaId]);
+
   return (
     <main className="min-h-[100dvh] pb-12">
       {hasSearched ? (
@@ -1239,7 +1309,14 @@ export default function ExplorePage() {
                         : "Refine your vibe and resubmit."}
               </span>
               {pageState === "loading" ? (
-                <span className="animate-pulse">Finding picks...</span>
+                <span className="flex items-center gap-0.5">
+                  <span>Finding picks</span>
+                  <span className="flex">
+                    <span className="animate-[pulse_1.4s_ease-in-out_infinite]">.</span>
+                    <span className="animate-[pulse_1.4s_ease-in-out_0.2s_infinite]">.</span>
+                    <span className="animate-[pulse_1.4s_ease-in-out_0.4s_infinite]">.</span>
+                  </span>
+                </span>
               ) : null}
             </div>
             {filtersReady ? (
@@ -1259,18 +1336,17 @@ export default function ExplorePage() {
           </div>
         </div>
       ) : (
-        <section className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
+        <section className="relative flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
           <div className="max-w-4xl space-y-8">
             <div className="space-y-3">
-              <h1 className="text-4xl font-semibold leading-tight text-foreground sm:text-4xl">
-                Find your next watch. Personalized to your taste.
+              <h1 className="font-display text-3xl font-bold leading-tight text-foreground sm:text-4xl animate-fade-up">
+                Find your next watch. Curated to your taste.
               </h1>
-              <p className="text-base text-muted-foreground sm:text-lg">
-                Reelix is your personal AI curator. It learns your taste and
-                brings you films you'll actually love.
+              <p className="text-base text-muted-foreground sm:text-lg animate-fade-up delay-100">
+                Your personal AI curator. Reelix understands your taste and brings you films you'll genuinely love.
               </p>
             </div>
-            <div className="mx-auto max-w-2xl">
+            <div className="mx-auto max-w-2xl animate-fade-up delay-200">
               <ExploreSearchForm
                 value={query}
                 onChange={setQuery}
@@ -1322,8 +1398,8 @@ export default function ExplorePage() {
           ) : null}
 
           {pageState === "chat" ? (
-            <div className="rounded-2xl border border-border bg-muted/10 p-6 shadow-sm">
-              <div className="prose prose-invert max-w-none text-base leading-relaxed text-foreground">
+            <div className="relative rounded-2xl border border-gold/20 border-l-4 border-l-gold bg-background/60 p-6 pl-5 shadow-lg backdrop-blur-sm animate-fade-in card-grain">
+              <div className="prose prose-invert prose-sm max-w-none text-base leading-relaxed text-zinc-200">
                 <ReactMarkdown>
                   {chatMessage || "Here's what we found."}
                 </ReactMarkdown>
@@ -1333,9 +1409,14 @@ export default function ExplorePage() {
 
           {pageState === "loading" ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-border bg-muted/10 p-6 shadow-sm">
-                <p className="text-base font-medium text-foreground">
-                  Curating picks for you...
+              <div className="relative rounded-2xl border border-gold/20 bg-background/60 p-6 shadow-lg backdrop-blur-sm card-grain">
+                <p className="flex items-center gap-0.5 text-base font-medium text-foreground">
+                  <span>Curating picks for you</span>
+                  <span className="flex">
+                    <span className="animate-[pulse_1.4s_ease-in-out_infinite]">.</span>
+                    <span className="animate-[pulse_1.4s_ease-in-out_0.2s_infinite]">.</span>
+                    <span className="animate-[pulse_1.4s_ease-in-out_0.4s_infinite]">.</span>
+                  </span>
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Hang tight while we tailor recommendations.
@@ -1347,15 +1428,15 @@ export default function ExplorePage() {
           {pageState === "recs" ? (
             <div className="space-y-4">
               {intro ? (
-                <div className="rounded-2xl border border-border bg-muted/10 p-6 shadow-sm">
-                  <div className="prose prose-invert max-w-none text-base leading-relaxed text-foreground">
+                <div className="relative rounded-2xl border border-gold/20 border-l-4 border-l-gold bg-background/60 p-6 pl-5 shadow-lg backdrop-blur-sm animate-fade-in card-grain">
+                  <div className="prose prose-invert prose-sm max-w-none text-base leading-relaxed text-zinc-200">
                     <ReactMarkdown>{intro}</ReactMarkdown>
                   </div>
                 </div>
               ) : null}
 
               {orderedCards.length > 0 ? (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 animate-fade-in">
                   {orderedCards.map((card) => {
                     const feedbackValue = card.mediaId
                       ? feedbackById[card.mediaId]
@@ -1400,7 +1481,7 @@ export default function ExplorePage() {
           !isAwaitingRecs &&
           hasRecsResponse &&
           orderedCards.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-muted/10 p-6 text-center text-muted-foreground">
+            <div className="rounded-2xl border border-border bg-muted/10 p-6 text-center text-base text-muted-foreground">
               No picks yet. Try a different vibe.
             </div>
           ) : null}

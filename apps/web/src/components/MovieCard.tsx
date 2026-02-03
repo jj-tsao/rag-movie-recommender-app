@@ -95,13 +95,13 @@ export default function MovieCard({
   const isWide = layout === "wide";
 
   const containerClass = clsx(
-    "group relative flex h-full flex-col overflow-visible rounded-xl border border-white/10 bg-background/95 text-white transition-all duration-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] hover:scale-[1.01]",
+    "group relative flex h-full flex-col overflow-visible rounded-xl border border-white/10 bg-background/95 text-white transition-all duration-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4),0_0_40px_rgba(197,165,114,0.15)] hover:scale-[1.01] card-grain",
     isWide ? "md:hover:-translate-y-0.5" : "hover:-translate-y-1"
   );
 
   const contentClass = clsx(
-    "relative z-10 flex flex-col gap-4 p-4 md:flex-row",
-    isWide && "gap-6 p-6"
+    "relative z-10 flex flex-col gap-3 px-4 py-3 md:flex-row",
+    isWide && "gap-5 px-6 py-3"
   );
 
   const posterWrapperClass = clsx(
@@ -109,16 +109,16 @@ export default function MovieCard({
     isWide && "max-w-[12rem] md:w-48"
   );
 
-  const titleClass = "text-2xl font-semibold leading-tight text-white";
+  const titleClass = "font-display text-4xl font-semibold leading-tight text-white tracking-tight";
   const metaClass = "text-sm text-zinc-300";
   const bulletClass = "text-zinc-500";
   const ratingContainerClass =
     "flex flex-wrap items-center gap-2 text-sm text-zinc-300";
   const whyHeaderClass =
-    "text-xs font-semibold uppercase tracking-wide text-zinc-400";
+    "text-sm font-semibold tracking-normal text-gold-dark";
   const emptyWhyClass = "text-sm italic text-zinc-400";
   const providerBadgeClass =
-    "rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-zinc-100 backdrop-blur";
+    "rounded-full border border-gold/20 bg-white/5 px-2.5 py-1 text-xs font-medium text-zinc-100 backdrop-blur";
   const feedbackValue = feedback?.value;
   const feedbackDisabled = feedback?.disabled ?? false;
   const feedbackLabelClass =
@@ -157,12 +157,12 @@ export default function MovieCard({
           )}
         </div>
 
-        <div className="flex flex-1 flex-col gap-4 text-sm">
+        <div className="flex flex-1 flex-col gap-3 text-sm">
           <div className="space-y-2">
-            <div className="flex flex-wrap items-baseline gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h2 className={titleClass}>{movie.title}</h2>
               {movie.releaseYear ? (
-                <span className="rounded-full border border-white/20 px-3 py-0.5 text-xs text-white/70">
+                <span className="inline-flex items-center rounded-full border border-gold/30 px-3 py-0.5 text-xs leading-none text-white/70">
                   {movie.releaseYear}
                 </span>
               ) : null}
@@ -194,7 +194,9 @@ export default function MovieCard({
               ) : hasRating ? (
                 <p className={ratingContainerClass}>
                   {hasValidScore(imdbRaw) ? (
-                    <span>⭐ {formatRating(imdbRaw)}/10</span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-gold">⭐</span> {formatRating(imdbRaw)}/10
+                    </span>
                   ) : null}
                   {hasValidScore(imdbRaw) && hasValidScore(rtRaw) ? (
                     <span className={bulletClass}>•</span>
@@ -204,9 +206,7 @@ export default function MovieCard({
                   ) : null}
                 </p>
               ) : (
-                <span className="text-sm italic text-zinc-400">
-                  Ratings pending
-                </span>
+                <span className="text-sm text-zinc-500/60">—</span>
               )}
             </div>
           </div>
@@ -238,7 +238,7 @@ export default function MovieCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => onTrailerClick?.()}
-                  className="inline-flex items-center gap-2 text-base font-medium text-blue-300 hover:underline"
+                  className="inline-flex items-center gap-2 text-base font-medium text-zinc-300 hover:text-gold-light transition-all hover:gap-2.5"
                 >
                   <img
                     src="/icons/play_icon.png"
@@ -393,7 +393,7 @@ function WatchlistButton({
         onClick={onAdd}
         disabled={busy}
         aria-live="polite"
-        className={clsx("gap-2 text-white", "bg-[#2563EB] hover:bg-[#1D4ED8]", baseButtonClasses)}
+        className={clsx("gap-2 text-background", "bg-gold hover:bg-gold-light transition-colors", baseButtonClasses)}
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
         Add to Watchlist
@@ -406,8 +406,8 @@ function WatchlistButton({
   const label = isWatched ? "Watched" : "In Watchlist";
 
   const buttonClass = isWatched
-    ? "bg-[#16A34A] hover:bg-[#15803D] text-white"
-    : "bg-[#064E3B] hover:bg-[#065F46] text-[#A7F3D0] border border-[#065F46]";
+    ? "bg-gold-dark hover:bg-[#8A6F42] text-white transition-colors"
+    : "bg-burgundy/80 hover:bg-burgundy text-gold-light border border-burgundy transition-colors";
 
   return (
     <div
@@ -639,7 +639,7 @@ function RatingPrompt({
                 className={clsx(
                   "h-5 w-5 transition-colors",
                   highlighted !== null && value <= highlighted
-                    ? "text-[#2563EB]"
+                    ? "text-gold"
                     : "text-white/35",
                 )}
                 strokeWidth={1.4}
@@ -690,7 +690,7 @@ function RatingPill({
       aria-label={label}
     >
       <Star
-        className={clsx("h-4 w-4", hasRating ? "text-[#2563EB]" : "text-white/40")}
+        className={clsx("h-4 w-4", hasRating ? "text-gold" : "text-white/40")}
         strokeWidth={hasRating ? 1.4 : 1.2}
         fill={hasRating ? "currentColor" : "none"}
         aria-hidden="true"
@@ -727,9 +727,11 @@ function FeedbackButton({
       aria-pressed={active}
       onClick={onClick}
       className={clsx(
-        "h-9 w-9 rounded-full border border-white/20 bg-black/40 px-0 text-zinc-200 transition-colors hover:bg-white/10",
-        active && activeClass,
-        disabled && "opacity-60"
+        "h-9 w-9 rounded-full border px-0 transition-all",
+        active
+          ? activeClass
+          : "border-gold/20 bg-background/60 text-zinc-300 hover:border-gold/40 hover:bg-gold/10 hover:text-gold-light",
+        disabled && "opacity-60 cursor-not-allowed"
       )}
       title={label}
     >
