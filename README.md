@@ -74,7 +74,7 @@ The result is a fast, AI-led natural language **“Explore by Vibe”** and **Fo
 
 ---
 
-## 🧠 How It Works – Agentic Workflow at a Glance
+## 🧠 Architecture - Agentic Workflow and Recommendation Pipeline
 
 At runtime, Reelix is a **three-agent system** (Orchestrator → Curator → Explanation) with a sophisticated recommendation engine:
 
@@ -350,12 +350,13 @@ Analytics and logging endpoints for tracking recommendation performance and cach
 ## 🏗️ Recommendation Pipeline Architecture (High‑Level)
 
 ```
-User Interactions ──▶ Taste Vector (user tower)
+User Interactions ──▶ Taste Vector (Long term memory)
                                     │
+                                    ▼
+              User Prompt ──▶ Orchestrator Agent (LLM)
                                     │
-User Prompt ──▶ Query Encoder ──────┤
-                                    │
-                                  Filters (genres, year, streaming provider)
+                                    ▼
+                               RecQuerySpec 
                                     │
                  ┌──────────────────┴──────────────────┐
                  ▼                                     ▼
