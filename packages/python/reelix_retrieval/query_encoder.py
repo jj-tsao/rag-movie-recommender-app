@@ -2,23 +2,11 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-import threading
-import re
 
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 
-
-_stop_words_lock = threading.Lock()
-# Cache stopwords/stemmer at import to avoid per-call overhead
-try:
-    _STOP_WORDS = set(stopwords.words("english"))
-except Exception as _e:  # Fallback if NLTK data missing at import
-    print("⚠️ Failed to preload NLTK stopwords:", _e)
-    _STOP_WORDS = set()
-_STEMMER = PorterStemmer()
+from reelix_retrieval.bm25_tokenizer import tokenize_for_bm25
 
 
 class Encoder:
@@ -38,23 +26,11 @@ class Encoder:
     def encode_dense(self, text: str) -> List[float]:
         return self.dense_model.encode(text).tolist()
 
-    # Sparse encoder (BM25)
-    @staticmethod
-    def _tokenize_and_preprocess(text: str) -> List[str]:
-        # Fast regex tokenization to avoid heavy Punkt tokenizers
-        tokens = re.findall(r"[a-z0-9]+", text.lower())
-        # Use cached stopwords and stemmer
-        with _stop_words_lock:
-            sw = _STOP_WORDS
-        filtered_tokens = [w for w in tokens if w not in sw]
-        processed_tokens = [_STEMMER.stem(w) for w in filtered_tokens]
-        return processed_tokens
-
     def encode_sparse(self, text: str, media_type: str) -> Dict[str, List[float]]:
         bm25_model = self.bm25_models[media_type.lower()]
         bm25_vocab = self.bm25_vocabs[media_type.lower()]
 
-        tokens = self._tokenize_and_preprocess(text)
+        tokens = tokenize_for_bm25(text)
         if not tokens:
             return {"indices": [], "values": []}
 

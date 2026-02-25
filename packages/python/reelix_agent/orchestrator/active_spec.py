@@ -208,18 +208,18 @@ def craft_active_spec(
     #         )
     #     )
 
-    # # Exclusions (if present) — show as filter-ish but soft/hard depends on your implementation
-    # for eg in active.exclude_genres:
-    #     chips.append(
-    #         Chip(
-    #             group="filters",
-    #             key="exclude_genres",
-    #             value=eg,
-    #             label=f"Not {_titleish(eg)}",
-    #             editable=True,
-    #             hard=True,  # exclusions behave like hard constraints
-    #             source="user",
-    #         )
-    #     )
+    # Exclusions (if present)
+    for eg in active.exclude_genres:
+        chips.append(
+            Chip(
+                group="filters",
+                key="exclude_genres",
+                value=eg,
+                label=f"Not {_titleish(eg)}",
+                editable=True,
+                hard=True,
+                source="user",
+            )
+        )
 
     return ActiveSpecEnvelope(active_spec=active, chips=chips, query_text=spec.query_text)

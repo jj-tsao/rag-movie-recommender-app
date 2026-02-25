@@ -1,8 +1,14 @@
 import { BASE_URL } from "@/api";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { getSupabaseAccessToken } from "@/lib/session";
+import { consumeSseStream, parseSseFrame, safeJsonParse } from "@/lib/streaming";
 import type { DeviceInfo } from "@/types/types";
-import { normalizeTomatoScore } from "../for_you/api";
+import {
+  normalizeTomatoScore,
+  toMediaId,
+  toOptionalNumber,
+  toOptionalRating,
+} from "../utils/parsing";
 
 export type ExploreMode = "CHAT" | "RECS";
 
@@ -114,6 +120,10 @@ export type ExploreStreamEvent =
         curator_opening?: string | null;
       };
     }
+  | {
+      type: "next_steps";
+      data: { query_id: string; text: string };
+    }
   | { type: "done"; data: Record<string, unknown> | null }
   | { type: "error"; data: Record<string, unknown> | null };
 
@@ -166,34 +176,7 @@ export async function streamExplore({
     throw new Error("Stream response missing body");
   }
 
-  const reader = body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sepIndex = buffer.indexOf("\n\n");
-    while (sepIndex !== -1) {
-      const rawEvent = buffer.slice(0, sepIndex);
-      buffer = buffer.slice(sepIndex + 2);
-      const parsed = parseExploreSseEvent(rawEvent);
-      if (parsed) {
-        onEvent(parsed);
-      }
-      sepIndex = buffer.indexOf("\n\n");
-    }
-  }
-
-  buffer += decoder.decode();
-  if (buffer.trim()) {
-    const parsed = parseExploreSseEvent(buffer.trimEnd());
-    if (parsed) {
-      onEvent(parsed);
-    }
-  }
+  await consumeSseStream(body, parseExploreSseEvent, onEvent);
 }
 
 export async function rerunExplore({
@@ -279,59 +262,7 @@ export async function streamExploreWhy({
     throw new Error("Stream response missing body");
   }
 
-  const reader = body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sepIndex = buffer.indexOf("\n\n");
-    while (sepIndex !== -1) {
-      const rawEvent = buffer.slice(0, sepIndex);
-      buffer = buffer.slice(sepIndex + 2);
-      const parsed = parseSseEvent(rawEvent);
-      if (parsed) {
-        onEvent(parsed);
-      }
-      sepIndex = buffer.indexOf("\n\n");
-    }
-  }
-
-  buffer += decoder.decode();
-  if (buffer.trim()) {
-    const parsed = parseSseEvent(buffer.trimEnd());
-    if (parsed) {
-      onEvent(parsed);
-    }
-  }
-}
-
-function parseSseFrame(raw: string): { eventType: string; data: string } | null {
-  if (!raw || raw.startsWith(":")) {
-    return null;
-  }
-
-  const lines = raw.split(/\r?\n/);
-  let eventType = "message";
-  const dataLines: string[] = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    if (line.startsWith(":")) continue;
-    if (line.startsWith("event:")) {
-      eventType = line.slice(6).trim();
-      continue;
-    }
-    if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).trimStart());
-      continue;
-    }
-  }
-
-  return { eventType, data: dataLines.join("\n") };
+  await consumeSseStream(body, parseSseEvent, onEvent);
 }
 
 function parseExploreSseEvent(raw: string): ExploreStreamEvent | null {
@@ -389,6 +320,12 @@ function parseExploreSseEvent(raw: string): ExploreStreamEvent | null {
         },
       };
     }
+    case "next_steps": {
+      const queryId = typeof json?.query_id === "string" ? json.query_id : null;
+      if (!queryId) return null;
+      const text = typeof json?.text === "string" ? json.text : "";
+      return { type: "next_steps", data: { query_id: queryId, text } };
+    }
     case "done":
       return { type: "done", data: json };
     case "error":
@@ -428,25 +365,6 @@ function parseSseEvent(raw: string): ExploreWhyEvent | null {
   }
 }
 
-function safeJsonParse<T>(value: string): T | null {
-  try {
-    return JSON.parse(value) as T;
-  } catch (error) {
-    void error;
-    return null;
-  }
-}
-
-function toMediaId(value: unknown): string | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    return value.trim();
-  }
-  return null;
-}
-
 export function mapToRatings(item: ExploreItem): {
   imdbRating: number | null;
   rottenTomatoesRating: number | null;
@@ -454,32 +372,8 @@ export function mapToRatings(item: ExploreItem): {
 } {
   const imdbRating = toOptionalRating(item.imdb_rating);
   const rottenTomatoesRating = normalizeTomatoScore(item.rt_score);
-  const releaseYear = toOptionalNumber(item.release_year);
+  const releaseYear = toOptionalNumber(item.release_year) ?? undefined;
   return { imdbRating, rottenTomatoesRating, releaseYear };
-}
-
-function toOptionalRating(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.round(value * 10) / 10;
-  }
-  if (typeof value === "string") {
-    const cleaned = value.trim().replace(/[^0-9.]/g, "");
-    if (!cleaned) return null;
-    const parsed = Number(cleaned);
-    if (Number.isFinite(parsed)) {
-      return Math.round(parsed * 10) / 10;
-    }
-  }
-  return null;
-}
-
-function toOptionalNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return undefined;
 }
 
 export async function logExploreFinalRecs({

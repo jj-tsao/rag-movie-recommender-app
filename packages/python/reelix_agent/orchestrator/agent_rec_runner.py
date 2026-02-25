@@ -104,6 +104,7 @@ class AgentRecRunner:
         return build_qfilter(
             providers=providers,
             year_range=year_range,
+            exclude_genres=spec.exclude_genres if spec.exclude_genres else None,
         )
 
     def _build_pipeline_params(self, spec: RecQuerySpec) -> dict:

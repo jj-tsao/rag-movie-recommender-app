@@ -12,10 +12,17 @@ import {
   fetchDiscoverInitial,
   getAccessToken,
   logDiscoverFinalRecs,
-  normalizeTomatoScore,
   streamDiscoverWhy,
   type DiscoverStreamEvent,
 } from "../api";
+import {
+  normalizeTomatoScore,
+  toMediaId,
+  toNumericMediaId,
+  toOptionalNumber,
+  toOptionalRating,
+  toStringArray,
+} from "../../utils/parsing";
 import DiscoverGridSkeleton from "../components/DiscoverGridSkeleton";
 import StreamStatusBar, { type StreamStatusState } from "../components/StreamStatusBar";
 import StreamingServiceFilterChip from "../components/StreamingServiceFilterChip";
@@ -24,8 +31,9 @@ import {
   upsertUserInteraction,
   type RatingValue,
 } from "@/features/taste_onboarding/api";
-import { rebuildTasteProfile } from "@/api";
 import { hasTasteProfile, type TasteProfileHttpError } from "@/features/taste_profile/api";
+import { DiscoverRebuildController } from "../lib/discoverRebuildController";
+import { FOR_YOU_COPY } from "../copy";
 import {
   createWatchlistItem,
   deleteWatchlistItem,
@@ -51,7 +59,7 @@ function toDiscoverCard(item: {
   rotten_tomatoes_rating?: unknown;
   why_source?: unknown;
 }): DiscoverCardData {
-  const mediaId = normalizeMediaId(item.media_id);
+  const mediaId = toMediaId(item.media_id) ?? "";
   const whyMarkdown = toWhyMarkdown(item.why_md);
   const imdbRating = toOptionalRating(item.imdb_rating);
   const rottenTomatoesRating = normalizeTomatoScore(item.rotten_tomatoes_rating);
@@ -61,7 +69,7 @@ function toDiscoverCard(item: {
     id: item.id,
     mediaId,
     title: item.title,
-    releaseYear: toOptionalNumber(item.release_year),
+    releaseYear: toOptionalNumber(item.release_year) ?? undefined,
     posterUrl: typeof item.poster_url === "string" ? item.poster_url : undefined,
     backdropUrl: typeof item.backdrop_url === "string" ? item.backdrop_url : undefined,
     trailerKey: typeof item.trailer_key === "string" ? item.trailer_key : undefined,
@@ -75,64 +83,6 @@ function toDiscoverCard(item: {
     isWhyLoading: !whyMarkdown && !isCached,
     isRatingsLoading: !(isCached || imdbRating !== null || rottenTomatoesRating !== null),
   };
-}
-
-function normalizeMediaId(value: unknown): string {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "string" && value.trim() !== "") {
-    return value.trim();
-  }
-  return "";
-}
-
-function toNumericMediaId(value: string): number | null {
-  if (!value) return null;
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return null;
-  return Math.trunc(numeric);
-}
-
-function toOptionalNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return undefined;
-}
-
-function toStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (typeof entry === "string") return entry;
-      if (entry && typeof entry === "object") {
-        if ("name" in entry && typeof (entry as { name: unknown }).name === "string") {
-          return (entry as { name: string }).name;
-        }
-        if ("provider" in entry && typeof (entry as { provider: unknown }).provider === "string") {
-          return (entry as { provider: string }).provider;
-        }
-      }
-      return null;
-    })
-    .filter((entry): entry is string => Boolean(entry));
-}
-
-function toOptionalRating(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.round(value * 10) / 10;
-  }
-  if (typeof value === "string") {
-    const cleaned = value.trim().replace(/[^0-9.]/g, "");
-    if (cleaned) {
-      const parsed = Number(cleaned);
-      if (Number.isFinite(parsed)) {
-        return Math.round(parsed * 10) / 10;
-      }
-    }
-  }
-  return null;
 }
 
 function toWhyMarkdown(value: unknown): string | undefined {
@@ -178,154 +128,12 @@ function isSameWatchlistEntry(a: WatchlistUiState | undefined, b: WatchlistUiSta
   );
 }
 
-const RATING_COUNT_KEY = "rating_count";
-const PENDING_REBUILD_KEY = "pending_rebuild";
-const LAST_REBUILD_KEY = "last_rebuild_at";
-const MIN_RATINGS_FOR_REBUILD = 2;
-const REBUILD_DELAY_MS = 10_000;
-const REBUILD_COOLDOWN_MS = 2 * 60 * 1000;
 const WATCHLIST_SOURCE = "discover_for_you";
 const DISCOVER_MEDIA_TYPE = "movie" as const;
 const LOOKUP_TRIGGER_SIZE = 12;
 const LOOKUP_MAX_BATCH = 20;
 const LOOKUP_DEBOUNCE_MS = 300;
 
-function parseStoredNumber(value: string | null): number | null {
-  if (typeof value !== "string") return null;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function isTruthyString(value: string | null): boolean {
-  return value === "true" || value === "1";
-}
-
-class DiscoverRebuildController {
-  private ratingTimer: ReturnType<typeof setTimeout> | null = null;
-  private cooldownTimer: ReturnType<typeof setTimeout> | null = null;
-  private ratingCount = 0;
-  private pendingRebuild = false;
-  private lastRebuildAt: number | null = null;
-  private rebuildInFlight = false;
-  private hydrated = false;
-
-  hydrate() {
-    if (typeof window === "undefined" || this.hydrated) return;
-
-    const storedCount = parseStoredNumber(window.localStorage.getItem(RATING_COUNT_KEY));
-    this.ratingCount = storedCount && storedCount > 0 ? Math.floor(storedCount) : 0;
-    window.localStorage.setItem(RATING_COUNT_KEY, String(this.ratingCount));
-
-    this.pendingRebuild = isTruthyString(window.localStorage.getItem(PENDING_REBUILD_KEY));
-
-    const storedLast = parseStoredNumber(window.localStorage.getItem(LAST_REBUILD_KEY));
-    this.lastRebuildAt = storedLast && storedLast > 0 ? storedLast : null;
-
-    this.hydrated = true;
-    this.resumeCooldown();
-  }
-
-  registerRating() {
-    if (typeof window === "undefined") return;
-    this.ratingCount += 1;
-    window.localStorage.setItem(RATING_COUNT_KEY, String(this.ratingCount));
-    this.startRatingTimer();
-  }
-
-  dispose() {
-    if (this.ratingTimer) {
-      clearTimeout(this.ratingTimer);
-      this.ratingTimer = null;
-    }
-    if (this.cooldownTimer) {
-      clearTimeout(this.cooldownTimer);
-      this.cooldownTimer = null;
-    }
-  }
-
-  private startRatingTimer() {
-    if (typeof window === "undefined") return;
-    if (this.ratingTimer) {
-      clearTimeout(this.ratingTimer);
-    }
-    this.ratingTimer = setTimeout(() => {
-      this.ratingTimer = null;
-      if (this.ratingCount >= MIN_RATINGS_FOR_REBUILD) {
-        void this.tryRebuild();
-      }
-    }, REBUILD_DELAY_MS);
-  }
-
-  private clearRatingTimer() {
-    if (this.ratingTimer) {
-      clearTimeout(this.ratingTimer);
-      this.ratingTimer = null;
-    }
-  }
-
-  private resumeCooldown() {
-    if (typeof window === "undefined") return;
-    if (this.cooldownTimer) {
-      clearTimeout(this.cooldownTimer);
-      this.cooldownTimer = null;
-    }
-    if (this.lastRebuildAt === null) {
-      if (this.pendingRebuild && this.ratingCount >= MIN_RATINGS_FOR_REBUILD && !this.rebuildInFlight) {
-        void this.tryRebuild();
-      }
-      return;
-    }
-    const remaining = REBUILD_COOLDOWN_MS - (Date.now() - this.lastRebuildAt);
-    if (remaining <= 0) {
-      if (this.pendingRebuild && !this.rebuildInFlight) {
-        void this.tryRebuild();
-      }
-      return;
-    }
-    this.cooldownTimer = setTimeout(() => {
-      this.cooldownTimer = null;
-      if (this.pendingRebuild && !this.rebuildInFlight) {
-        void this.tryRebuild();
-      }
-    }, remaining);
-  }
-
-  private async tryRebuild() {
-    if (this.rebuildInFlight) return;
-    if (typeof window === "undefined") return;
-    if (this.ratingCount < MIN_RATINGS_FOR_REBUILD && !this.pendingRebuild) return;
-
-    const now = Date.now();
-    if (this.lastRebuildAt !== null && now - this.lastRebuildAt < REBUILD_COOLDOWN_MS) {
-      if (!this.pendingRebuild) {
-        this.pendingRebuild = true;
-        window.localStorage.setItem(PENDING_REBUILD_KEY, "true");
-      }
-      this.resumeCooldown();
-      return;
-    }
-
-    this.rebuildInFlight = true;
-
-    try {
-      await rebuildTasteProfile();
-      this.ratingCount = 0;
-      window.localStorage.setItem(RATING_COUNT_KEY, "0");
-      this.pendingRebuild = false;
-      window.localStorage.removeItem(PENDING_REBUILD_KEY);
-      this.clearRatingTimer();
-    } catch (error) {
-      console.warn("Failed to rebuild taste profile from discover feed", error);
-      this.pendingRebuild = true;
-      window.localStorage.setItem(PENDING_REBUILD_KEY, "true");
-    } finally {
-      this.lastRebuildAt = now;
-      window.localStorage.setItem(LAST_REBUILD_KEY, String(now));
-      this.rebuildInFlight = false;
-      this.resumeCooldown();
-    }
-  }
-}
 
 export default function ForYouPage() {
   const [pageState, setPageState] = useState<PageState>("idle");
@@ -382,7 +190,6 @@ export default function ForYouPage() {
     () => mapStreamingServiceNamesToIds(selectedProviders),
     [selectedProviders],
   );
-  const selectedGenresForQuery = useMemo(() => [...selectedGenres], [selectedGenres]);
 
   const flushLookupQueue = useCallback(async () => {
     if (lookupTimerRef.current) {
@@ -601,11 +408,11 @@ export default function ForYouPage() {
 
   const handleStreamEvent = useCallback((event: DiscoverStreamEvent) => {
     if (event.type === "started") {
-      setStreamState({ status: "streaming", message: "Streaming reasons…" });
+      setStreamState({ status: "streaming", message: FOR_YOU_COPY.status.streamingReasons });
       return;
     }
     if (event.type === "progress") {
-      const message = typeof event.data?.message === "string" ? event.data.message : "Still thinking…";
+      const message = typeof event.data?.message === "string" ? event.data.message : FOR_YOU_COPY.status.stillThinking;
       setStreamState((prev) => ({
         status: prev.status === "idle" ? "streaming" : prev.status,
         message,
@@ -613,7 +420,7 @@ export default function ForYouPage() {
       return;
     }
     if (event.type === "why_delta") {
-      const mediaId = normalizeMediaId(event.data.media_id);
+      const mediaId = toMediaId(event.data.media_id);
       if (!mediaId) return;
       setCards((prev) => {
         const next = { ...prev };
@@ -677,7 +484,7 @@ export default function ForYouPage() {
         if (!token) {
           if (!cancelled) {
             setPageState("unauthorized");
-            setErrorMessage("Sign in to view your discovery feed.");
+            setErrorMessage(FOR_YOU_COPY.error.unauthorized);
             setCards({});
             setOrder([]);
           }
@@ -689,10 +496,13 @@ export default function ForYouPage() {
           profileExists = await hasTasteProfile(token);
         } catch (profileError) {
           if (cancelled) return;
-          const status = (profileError as TasteProfileHttpError | undefined)?.status;
+          const status =
+            profileError instanceof Error && "status" in profileError
+              ? (profileError as TasteProfileHttpError).status
+              : undefined;
           if (status === 401 || status === 403) {
             setPageState("unauthorized");
-            setErrorMessage("Sign in to view your discovery feed.");
+            setErrorMessage(FOR_YOU_COPY.error.unauthorized);
             setCards({});
             setOrder([]);
             return;
@@ -719,7 +529,7 @@ export default function ForYouPage() {
           pageSize: 12,
           includeWhy: false,
           providerIds: selectedProviderIds,
-          genres: selectedGenresForQuery,
+          genres: selectedGenres,
         });
         if (cancelled) return;
 
@@ -730,7 +540,7 @@ export default function ForYouPage() {
           mapped[card.mediaId] = card;
         });
         const newOrder = response.items
-          .map((item) => normalizeMediaId(item.media_id))
+          .map((item) => toMediaId(item.media_id))
           .filter((id): id is string => Boolean(id));
         setCards(mapped);
         setOrder(newOrder);
@@ -781,7 +591,7 @@ export default function ForYouPage() {
       cancelled = true;
       abortRef.current?.abort();
     };
-  }, [refreshIndex, handleStreamEvent, ensureWatchlistEntries, selectedProviderIds, selectedGenresForQuery]);
+  }, [refreshIndex, handleStreamEvent, ensureWatchlistEntries, selectedProviderIds, selectedGenres]);
 
   const streamPhase: StreamPhase = streamState.status;
   const canCancel = streamPhase === "connecting" || streamPhase === "streaming";
@@ -1286,9 +1096,9 @@ export default function ForYouPage() {
   return (
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-24 pt-8">
       <header className="flex flex-col gap-2">
-        <h1 className="font-display text-3xl font-bold leading-tight text-foreground sm:text-4xl">For You</h1>
+        <h1 className="font-display text-3xl font-bold leading-tight text-foreground sm:text-4xl">{FOR_YOU_COPY.page.heading}</h1>
         <p className="text-sm text-muted-foreground">
-          Fresh picks tailored to your taste. Updated live as our agent reasons in real time.
+          {FOR_YOU_COPY.page.subheading}
         </p>
       </header>
 
@@ -1301,7 +1111,7 @@ export default function ForYouPage() {
 
       {pageState === "unauthorized" && (
         <div className="rounded-xl border border-dashed border-border bg-background/60 p-8 text-center">
-          <p className="mb-4 text-sm text-muted-foreground">{errorMessage ?? "Sign in to continue."}</p>
+          <p className="mb-4 text-sm text-muted-foreground">{errorMessage ?? FOR_YOU_COPY.error.signInContinue}</p>
           <Button onClick={handleRetry} variant="outline">
             Retry
           </Button>
@@ -1321,21 +1131,21 @@ export default function ForYouPage() {
 
       {pageState === "ready" && orderedCards.length === 0 && (
         <div className="rounded-xl border border-border bg-background/60 p-8 text-center text-sm text-muted-foreground">
-          No recommendations available right now. Try refreshing in a moment.
+          {FOR_YOU_COPY.empty.noRecs}
         </div>
       )}
 
       {pageState === "missingTasteProfile" && (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-background/60 px-8 py-12 text-center">
-          <h2 className="text-xl font-semibold text-foreground">Build your taste profile</h2>
+          <h2 className="text-xl font-semibold text-foreground">{FOR_YOU_COPY.missingProfile.heading}</h2>
           <p className="max-w-md text-sm text-muted-foreground">
-            Take a minute to share what you enjoy watching so we can personalize your discovery feed.
+            {FOR_YOU_COPY.missingProfile.body}
           </p>
           <div className="flex flex-col items-center gap-2">
             <Button className="rounded-full px-6" size="lg" onClick={handleStartTasteOnboarding}>
-              Personalize my feed
+              {FOR_YOU_COPY.missingProfile.cta}
             </Button>
-            <span className="text-xs text-muted-foreground">Takes under a minute. No sign-up needed.</span>
+            <span className="text-xs text-muted-foreground">{FOR_YOU_COPY.missingProfile.ctaNote}</span>
           </div>
         </div>
       )}

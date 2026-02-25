@@ -61,6 +61,30 @@ class TierSummaryLog(BaseModel):
     tier_latency_ms: int | None = None
 
 
+class ReflectionLog(BaseModel):
+    """Data for logging reflection agent next-step suggestions."""
+
+    query_id: str
+    session_id: str
+    user_id: str | None = None
+
+    # Reflection output (null if failed/timed out)
+    strategy: str | None = None
+    suggestion: str | None = None
+
+    # Outcome
+    status: str  # "success", "timeout", "error"
+
+    # Performance
+    latency_ms: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    model: str | None = None
+
+    # Context snapshot
+    tier_stats: dict[str, Any] | None = None
+
+
 class AgentDecisionLog(BaseModel):
     """Data for logging orchestrator agent decisions."""
 
@@ -377,6 +401,33 @@ class TelemetryLogger:
         }
 
         await self._post("agent_decisions", [row])
+
+    async def log_reflection(
+        self,
+        reflection: ReflectionLog,
+    ) -> None:
+        """
+        Insert reflection agent log into reflection_logs table.
+        One row per reflection attempt (success, timeout, or error).
+        """
+        if not self._enabled():
+            return
+
+        row = {
+            "query_id": reflection.query_id,
+            "session_id": reflection.session_id,
+            "user_id": reflection.user_id,
+            "strategy": reflection.strategy,
+            "suggestion": reflection.suggestion,
+            "status": reflection.status,
+            "latency_ms": reflection.latency_ms,
+            "input_tokens": reflection.input_tokens,
+            "output_tokens": reflection.output_tokens,
+            "model": reflection.model,
+            "tier_stats": self.to_jsonable(reflection.tier_stats) if reflection.tier_stats else None,
+        }
+
+        await self._post("reflection_logs", [row])
 
 
 # ---------- SSE stream aggregator ----------

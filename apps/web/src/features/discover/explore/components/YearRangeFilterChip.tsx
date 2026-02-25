@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 import YearRangeSlider from "@/components/YearRangeSlider";
 import { YEAR_RANGE_MAX, YEAR_RANGE_MIN } from "@/utils/yearRange";
+import { cn } from "@/lib/utils";
 
 interface Props {
   value: [number, number] | null;
   onApply: (range: [number, number] | null) => void;
   min?: number;
   max?: number;
+  dropdownDirection?: "up" | "down";
+  compact?: boolean;
 }
 
 export default function YearRangeFilterChip({
@@ -15,6 +19,8 @@ export default function YearRangeFilterChip({
   onApply,
   min = YEAR_RANGE_MIN,
   max = YEAR_RANGE_MAX,
+  dropdownDirection = "down",
+  compact = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<[number, number]>(value ?? [min, max]);
@@ -95,21 +101,22 @@ export default function YearRangeFilterChip({
         type="button"
         variant="outline"
         size="sm"
-        className="h-auto rounded-full border-gold/20 bg-background px-3 py-1.5 text-sm shadow-xs transition-all hover:border-gold/40 hover:shadow-md focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/50"
+        className={cn(
+          "h-auto rounded-full border-gold/20 bg-background shadow-[0_0_8px_rgba(196,164,105,0.08)] transition-all hover:border-gold/40 hover:shadow-[0_0_12px_rgba(196,164,105,0.15)] focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/50",
+          compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm",
+        )}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={label === "Years" ? "Filter by years: all years" : `Filter by years: ${label}`}
       >
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
           <span className="text-foreground">{label}</span>
-          <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 text-muted-foreground">
-            <path fill="currentColor" d="M5.5 7.5L10 12l4.5-4.5h-9z" />
-          </svg>
+          <ChevronDown className={cn("text-muted-foreground", compact ? "size-3" : "size-4")} />
         </div>
       </Button>
 
       {open ? (
-        <div className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-gold/30 bg-background shadow-xl">
+        <div className={cn("absolute left-0 z-50 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-gold/30 bg-background shadow-xl", dropdownDirection === "up" ? "bottom-full mb-2" : "mt-2")}>
           <div className="p-4">
             <YearRangeSlider min={min} max={max} values={pending} onChange={setPending} />
           </div>

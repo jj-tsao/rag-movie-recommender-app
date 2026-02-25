@@ -1,6 +1,8 @@
 import { BASE_URL } from "@/api";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { getSupabaseAccessToken } from "@/lib/session";
+import { consumeSseStream, parseSseFrame, safeJsonParse } from "@/lib/streaming";
+import { normalizeTomatoScore, toMediaId, toOptionalNumber } from "../utils/parsing";
 
 export interface DiscoverInitialItem {
   id?: string;
@@ -137,34 +139,7 @@ export async function streamDiscoverWhy({
     throw new Error("Stream response missing body");
   }
 
-  const reader = body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sepIndex = buffer.indexOf("\n\n");
-    while (sepIndex !== -1) {
-      const rawEvent = buffer.slice(0, sepIndex);
-      buffer = buffer.slice(sepIndex + 2);
-      const parsed = parseSseEvent(rawEvent);
-      if (parsed) {
-        onEvent(parsed);
-      }
-      sepIndex = buffer.indexOf("\n\n");
-    }
-  }
-
-  buffer += decoder.decode();
-  if (buffer.trim()) {
-    const parsed = parseSseEvent(buffer.trimEnd());
-    if (parsed) {
-      onEvent(parsed);
-    }
-  }
+  await consumeSseStream(body, parseSseEvent, onEvent);
 }
 
 export async function logDiscoverFinalRecs({
@@ -203,32 +178,11 @@ export async function logDiscoverFinalRecs({
 }
 
 function parseSseEvent(raw: string): DiscoverStreamEvent | null {
-  if (!raw || raw.startsWith(":")) {
-    return null;
-  }
+  const frame = parseSseFrame(raw);
+  if (!frame) return null;
 
-  const lines = raw.split(/\r?\n/);
-  let eventType = "message";
-  const dataLines: string[] = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    if (line.startsWith(":")) {
-      continue;
-    }
-    if (line.startsWith("event:")) {
-      eventType = line.slice(6).trim();
-      continue;
-    }
-    if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).trimStart());
-      continue;
-    }
-  }
-
-  const dataStr = dataLines.join("\n");
-  const json = dataStr ? safeJsonParse<Record<string, unknown>>(dataStr) : null;
-  switch (eventType) {
+  const json = frame.data ? safeJsonParse<Record<string, unknown>>(frame.data) : null;
+  switch (frame.eventType) {
     case "why_delta": {
       const delta = json as {
         media_id?: number | string;
@@ -266,62 +220,3 @@ function parseSseEvent(raw: string): DiscoverStreamEvent | null {
   }
 }
 
-function safeJsonParse<T>(value: string): T | null {
-  try {
-    return JSON.parse(value) as T;
-  } catch (error) {
-    void error;
-    return null;
-  }
-}
-
-function toOptionalNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-function toMediaId(value: unknown): string | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    return value.trim();
-  }
-  return null;
-}
-
-export function normalizeTomatoScore(value: unknown): number | null {
-  let parsed: number | null = null;
-
-  if (typeof value === "string") {
-    const cleaned = value.trim().replace(/[^0-9.]/g, "");
-    if (cleaned) {
-      const num = Number(cleaned);
-      parsed = Number.isFinite(num) ? num : null;
-    }
-  }
-
-  if (parsed === null) {
-    parsed = toOptionalNumber(value);
-  }
-
-  if (parsed === null) return null;
-
-  if (parsed <= 1) {
-    const scaled = parsed * 100;
-    if (!Number.isFinite(scaled)) return null;
-    return Math.round(scaled * 10) / 10;
-  }
-
-  if (parsed > 1000) {
-    return Math.round(parsed / 10);
-  }
-
-  return Math.round(parsed * 10) / 10;
-}

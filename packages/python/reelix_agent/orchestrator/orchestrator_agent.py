@@ -79,7 +79,9 @@ async def plan_orchestrator_agent(
                         mem.update(parsed)
                 except Exception:
                     pass
+            mem["turn_kind"] = "chat"  # Overwrite turn_kind to chat
             mem["last_user_message"] = state.user_text or ""
+            mem["last_admin_message"] = msg
 
             state.turn_message = msg
             state.turn_memory = mem

@@ -14,7 +14,7 @@ from reelix_agent.core.types import (
     RecQuerySpec,
 )
 from reelix_agent.orchestrator.orchestrator_prompts import (
-    ORCHESTRATOR_SYSTEM_PROMPT,
+    ORCHESTRATOR_SYSTEM_PROMPT_V1,
     build_orchestrator_user_prompt,
     build_session_memory_message,
 )
@@ -90,7 +90,7 @@ class AgentState(AgentBaseModel):
         
         # Build the admin/user message contents this turn for orchestrator LLM
         current_year = datetime.now().year
-        system_prompt = ORCHESTRATOR_SYSTEM_PROMPT.replace(
+        system_prompt = ORCHESTRATOR_SYSTEM_PROMPT_V1.replace(
             "{{CURRENT_YEAR}}", str(current_year)
         )
 

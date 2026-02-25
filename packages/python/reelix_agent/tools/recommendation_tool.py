@@ -28,15 +28,13 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
         "rec_query_spec": {
             "type": "object",
             "description": (
-                "Structured rec_query_spec describing the recommendation query: "
-                "intent, media type, core genres, sub-genres, tone, and structural/thematic preferences."
+                "Structured rec_query_spec describing the recommendation query"
             ),
             "properties": {
                 "query_text": {
                     "type": "string",
                     "description": (
-                        "Compact retrieval-oriented description of what the user wants. "
-                        "Include genre/vibe/tone/structure. Exclude greetings and meta-instructions."
+                        "Compact retrieval-oriented description of what the user wants. Exclude meta-instructions (e.g., 'on Netflix', 'in the 90s')"
                     ),
                 },
                 "media_type": {
@@ -47,8 +45,37 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
                 "core_genres": {
                     "type": "array",
                     "description": (
-                        "List of canonical genre names to prioritize/include "
-                        "(e.g., 'Drama', 'Comedy', 'Science Fiction')."
+                        "List of canonical genre names to prioritize"
+                    ),
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "Action",
+                            "Comedy",
+                            "Drama",
+                            "Romance",
+                            "Science Fiction",
+                            "Thriller",
+                            "Adventure",
+                            "Animation",
+                            "Crime",
+                            "Documentary",
+                            "Family",
+                            "Fantasy",
+                            "History",
+                            "Horror",
+                            "Music",
+                            "Mystery",
+                            "War",
+                            "Western",
+                        ],
+                    },
+                },
+                "exclude_genres": {
+                    "type": "array",
+                    "description": (
+                        "Genres the user explicitly wants to EXCLUDE (e.g., 'no horror', 'skip animation'). "
+                        "Only populate when the user expresses a negative genre preference."
                     ),
                     "items": {
                         "type": "string",
@@ -77,16 +104,14 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
                 "sub_genres": {
                     "type": "array",
                     "description": (
-                        "List of more specific sub-genre descriptors such as "
-                        "'psychological thriller', 'romantic comedy', 'neo-noir', 'dark fantasy'."
+                        "List of more specific sub-genre descriptors like 'psychological thriller', 'romantic comedy'."
                     ),
                     "items": {"type": "string"},
                 },
                 "core_tone": {
                     "type": "array",
                     "description": (
-                        "List of tone/vibe adjectives for how the content should feel emotionally, "
-                        "such as 'satirical', 'cozy', 'bleak', 'uplifting'."
+                        "List of tone/vibe adjectives for how the content should feel emotionally"
                     ),
                     "items": {"type": "string"},
                 },
@@ -101,8 +126,7 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
                 "key_themes": {
                     "type": "array",
                     "description": (
-                        "List of thematic ideas or subject-matter concerns, such as "
-                        "'existential', 'class satire', 'coming-of-age', 'identity'."
+                        "List of thematic ideas or subject-matter concerns."
                     ),
                     "items": {"type": "string"},
                 },
@@ -153,14 +177,12 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
                     "type": "array",
                     "description": (
                         "Movie titles explicitly mentioned by user as examples "
-                        "(e.g., 'I like Interstellar', 'similar to The Matrix'). "
-                        "Extract title only. These will be automatically excluded from results."
                     ),
                     "items": {"type": "string"},
                     "default": [],
                 },
             },
-            "required": ["query_text"],
+            "required": ["query_text", "media_type"],
             "additionalProperties": False,
         },
         "memory_delta": {
@@ -174,8 +196,7 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
                 "recent_feedback": {
                     "type": ["object", "null"],
                     "description": (
-                        "Only include when user is reacting to prior recommendations "
-                        "or iterating on the last slate. Otherwise null."
+                        "Only include when user is reacting to prior recommendations. Otherwise null."
                     ),
                     "properties": {
                         "liked_slots": {"type": "array", "items": {"type": "string"}},
@@ -192,9 +213,7 @@ RECOMMENDATION_AGENT_SCHEMA: dict[str, Any] = {
         "opening_summary": {
             "type": "string",
             "description": (
-                "Exactly 2 sentences (max ~220 chars). "
                 "Summarize the user's current request based on rec_query_spec. "
-                "Do NOT name specific titles. Do NOT promise outcomes."
             ),
         },
     },
@@ -239,6 +258,12 @@ async def handle_recommendation_agent(ctx: ToolContext, args: dict[str, Any]) ->
     if mentioned_titles:
         spec.seed_titles = mentioned_titles
         print(f"[recommendation_tool] Will exclude mentioned titles: {mentioned_titles}")
+
+    # Extract exclude_genres for Qdrant hard filtering
+    exclude_genres = raw_spec.get("exclude_genres") or []
+    if exclude_genres:
+        spec.exclude_genres = exclude_genres
+        print(f"[recommendation_tool] Will exclude genres: {exclude_genres}")
 
     state.query_spec = spec
     state.turn_mode = AgentMode.RECS

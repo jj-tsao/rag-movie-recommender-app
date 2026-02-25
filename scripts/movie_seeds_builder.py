@@ -3,7 +3,7 @@ from reelix_core.config import (
     QDRANT_ENDPOINT,
     QDRANT_MOVIE_COLLECTION_NAME,
 )
-from reelix_retrieval.filter_builder import build_qfilter
+from reelix_retrieval.qdrant_filter import build_qfilter
 from reelix_retrieval.vectorstore import connect_qdrant
 
 SEEDS_300 = {

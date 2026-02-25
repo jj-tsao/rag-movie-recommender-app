@@ -10,6 +10,9 @@ RERANKER_MODEL = "JJTsao/movietv-reranker-cross-encoder-base-v1"
 AGENT_MODEL = "gpt-4.1-mini"
 CHAT_COMPLETION_MODEL = "gpt-4o-mini"
 
+VECTOR_DIM = 768
+DENSE_VECTOR_NAME = "dense_vector"
+SPARSE_VECTOR_NAME = "sparse_vector"
 
 NLTK_PATH = Path(__file__).resolve().parent.parent / "reelix_models" / "assets" / "nltk_data"
 BM25_PATH = Path(__file__).resolve().parent.parent / "reelix_models" / "assets" / "bm25_files"

@@ -35,6 +35,7 @@ WATCH_PROVIDERS = {
 def build_qfilter(
     exclude_ids: Optional[list[int]] = None,
     genres: Optional[list[str]] = None,
+    exclude_genres: Optional[list[str]] = None,
     providers: Optional[list[int]] = None,
     year_range: Optional[Tuple[int, int]] = (1970, datetime.now().year),
     titles: Optional[list[str]] = None,
@@ -47,6 +48,13 @@ def build_qfilter(
         must_not.append(
             FieldCondition(
                 key="media_id", match=qmodels.MatchAny(any=list(exclude_ids))
+            )
+        )
+
+    if exclude_genres:
+        must_not.append(
+            FieldCondition(
+                key="genres", match=qmodels.MatchAny(any=list(exclude_genres))
             )
         )
 

@@ -5,6 +5,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 import logging
+import time
 import uuid
 from pydantic import BaseModel, ValidationError
 
@@ -19,6 +20,9 @@ from reelix_agent.orchestrator.orchestrator_agent import (
 from reelix_agent.orchestrator.active_spec import craft_active_spec
 from reelix_agent.explanation.explanation_prompts import build_why_prompt_envelope
 from reelix_agent.explanation.explanation_agent import stream_why_events
+from reelix_agent.reflection import generate_next_steps
+from reelix_agent.reflection.reflection_agent import REFLECTION_MODEL
+from reelix_logging.rec_logger import ReflectionLog
 
 from app.deps.deps import (
     get_agent_rec_runner,
@@ -71,6 +75,7 @@ async def explore_stream(
       - done / error
     """
     session_state = await state_store.get_session(session_id=req.session_id, touch=True)
+    print (session_state)
 
     agent_input = ExploreAgentInput(
         user_id=user_id,
@@ -221,6 +226,94 @@ async def explore_stream(
                     "stream_url": f"/discovery/explore/why?query_id={req.query_id}",
                 },
             )
+
+            # Clear stale last_admin_message before reflection attempt
+            def _clear_admin_msg(payload: dict) -> None:
+                summary = payload.get("summary")
+                if isinstance(summary, dict):
+                    summary.pop("last_admin_message", None)
+                    # Keep last_reflection_strategy — need it for the next reflection call
+
+            await state_store.update_session(
+                session_id=req.session_id,
+                ttl_sec=IDLE_TTL_SEC,
+                mutate=_clear_admin_msg,
+            )
+
+            # Reflection agent: suggest next steps (best-effort, skip on timeout/error)
+            if final_recs and query_spec:
+                # Read previous strategy from session to avoid repeating
+                _prev_strategy = None
+                if session_state and session_state.summary:
+                    _prev_strategy = session_state.summary.get("last_reflection_strategy")
+
+                _refl_t0 = time.perf_counter()
+                _refl_status = "error"
+                reflection = None
+                try:
+                    reflection = await asyncio.wait_for(
+                        generate_next_steps(
+                            chat_llm=chat_llm,
+                            query_spec=query_spec,
+                            final_recs=final_recs,
+                            tier_stats=agent_result.tier_stats,
+                            previous_strategy=_prev_strategy,
+                        ),
+                        timeout=10.0,
+                    )
+                    _refl_status = "success" if reflection else "error"
+                except asyncio.TimeoutError:
+                    _refl_status = "timeout"
+                    log.warning("Reflection agent timed out")
+                except Exception:
+                    _refl_status = "error"
+                    log.warning("Reflection agent failed")
+
+                _refl_ms = int((time.perf_counter() - _refl_t0) * 1000)
+
+                # Log reflection attempt (fire-and-forget)
+                asyncio.create_task(
+                    logger.log_reflection(ReflectionLog(
+                        query_id=req.query_id,
+                        session_id=req.session_id,
+                        user_id=user_id,
+                        strategy=reflection.strategy if reflection else None,
+                        suggestion=reflection.suggestion if reflection else None,
+                        status=_refl_status,
+                        latency_ms=_refl_ms,
+                        input_tokens=reflection.input_tokens if reflection else None,
+                        output_tokens=reflection.output_tokens if reflection else None,
+                        model=REFLECTION_MODEL,
+                        tier_stats=agent_result.tier_stats,
+                    ))
+                )
+
+                if reflection:
+                    yield sse(
+                        "next_steps",
+                        {
+                            "query_id": req.query_id,
+                            "strategy": reflection.strategy,
+                            "text": reflection.suggestion,
+                        },
+                    )
+                    # Persist as last_admin_message + last_reflection_strategy for next-turn context
+                    next_steps_text = reflection.suggestion
+                    next_steps_strategy = reflection.strategy
+                    def _patch(payload: dict) -> None:
+                        summary = payload.setdefault("summary", {})
+                        if isinstance(summary, dict):
+                            summary["last_admin_message"] = next_steps_text
+                            summary["last_reflection_strategy"] = next_steps_strategy
+
+                    asyncio.create_task(
+                        state_store.update_session(
+                            session_id=req.session_id,
+                            ttl_sec=IDLE_TTL_SEC,
+                            mutate=_patch,
+                        )
+                    )
+
             yield sse("done", {"ok": True})
 
         except Exception:
@@ -320,7 +413,7 @@ async def explore_rerun(
         logger=logger,
     )
 
-    # 5) Upsert session memory using existing code
+    # 5) Upsert session memory
     await upsert_session_memory(
         state_store=state_store,
         session_id=req.session_id,

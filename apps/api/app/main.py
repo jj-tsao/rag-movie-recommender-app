@@ -18,6 +18,8 @@ from reelix_core.config import (
     QDRANT_MOVIE_COLLECTION_NAME,
     QDRANT_TV_COLLECTION_NAME,
 )
+
+os.environ.setdefault("NLTK_DATA", str(NLTK_PATH))
 from reelix_logging.rec_logger import TelemetryLogger
 from app.infrastructure.cache.redis_infra import make_redis_clients
 from app.infrastructure.cache.ticket_store import TicketStore
@@ -55,7 +57,6 @@ def _should_init_recommendation() -> bool:
 
 
 def _init_recommendation_stack(app: FastAPI) -> None:
-    import nltk
 
     from reelix_models.custom_models import (
         load_bm25_files,
@@ -91,10 +92,6 @@ def _init_recommendation_stack(app: FastAPI) -> None:
         )
 
     # == Initialize recommendation stacks ==
-    nltk_data_path = str(NLTK_PATH)
-    if nltk_data_path not in nltk.data.path:
-        nltk.data.path.append(nltk_data_path)
-
     embed_model = load_sentence_model()
     bm25_models, bm25_vocabs = load_bm25_files()
     query_encoder = Encoder(embed_model, bm25_models, bm25_vocabs)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -86,7 +87,14 @@ class WhyCache:
         pipe = self._r.pipeline()
         for k in keys:
             pipe.get(k)
-        results = await pipe.execute()
+        try:
+            results = await pipe.execute()
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "WhyCache.get_many failed; treating as cache miss",
+                exc_info=exc,
+            )
+            return {}
         out: Dict[int, CachedWhy] = {}
         for mid, raw in zip(media_ids, results):
             value = self._deserialize(raw)

@@ -128,3 +128,41 @@ create table if not exists tier_summaries (
 
 create index if not exists idx_tier_summaries_query_id on tier_summaries (query_id);
 create index if not exists idx_tier_summaries_rule on tier_summaries (selection_rule, created_at desc);
+
+-- -----------------------------------------------------------------------------
+-- reflection_logs: Reflection agent next-step suggestions
+-- -----------------------------------------------------------------------------
+-- One row per reflection attempt capturing:
+-- - Strategy chosen and suggestion text
+-- - Outcome status (success, timeout, error)
+-- - LLM token usage and latency
+-- - Tier stats context for offline analysis
+create table if not exists reflection_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+
+  -- Identifiers
+  query_id text not null,
+  session_id text not null,
+  user_id uuid,
+
+  -- Reflection output (null if failed/timed out)
+  strategy text,   -- 'more_like_title', 'explore_adjacent', 'shift_era'
+  suggestion text,
+
+  -- Outcome
+  status text not null,  -- 'success', 'timeout', 'error'
+
+  -- Performance metrics
+  latency_ms int,
+  input_tokens int,
+  output_tokens int,
+  model text,
+
+  -- Context snapshot from curator (for offline analysis)
+  tier_stats jsonb
+);
+
+create index if not exists idx_reflection_logs_query_id on reflection_logs (query_id);
+create index if not exists idx_reflection_logs_strategy on reflection_logs (strategy, created_at desc);
+create index if not exists idx_reflection_logs_status on reflection_logs (status);

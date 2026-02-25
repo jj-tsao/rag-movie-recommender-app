@@ -10,9 +10,11 @@ import {
 type Props = {
   selected: string[];
   onApply: (names: string[]) => void;
+  dropdownDirection?: "up" | "down";
+  compact?: boolean;
 };
 
-export default function StreamingServiceFilterChip({ selected, onApply }: Props) {
+export default function StreamingServiceFilterChip({ selected, onApply, dropdownDirection = "down", compact = false }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<string[]>(selected);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,7 +107,10 @@ export default function StreamingServiceFilterChip({ selected, onApply }: Props)
         type="button"
         variant="outline"
         size="sm"
-        className="h-auto rounded-full border-gold/20 bg-background px-3 py-1.5 text-sm shadow-xs transition-all hover:border-gold/40 hover:shadow-md focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/50"
+        className={cn(
+          "h-auto rounded-full border-gold/20 bg-background shadow-[0_0_8px_rgba(196,164,105,0.08)] transition-all hover:border-gold/40 hover:shadow-[0_0_12px_rgba(196,164,105,0.15)] focus-visible:border-gold focus-visible:ring-2 focus-visible:ring-gold/50",
+          compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm",
+        )}
         onClick={() => setOpen((openState) => !openState)}
         aria-expanded={open}
         aria-label={
@@ -114,27 +119,27 @@ export default function StreamingServiceFilterChip({ selected, onApply }: Props)
             : `Filter by streaming services: ${selected.join(", ")}`
         }
       >
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
           {selected.length === 0 ? (
             <span className="text-foreground">All services</span>
           ) : (
             <span className="flex items-center gap-1">
               {topSelected.map((name) => (
-                <ProviderLogo key={name} option={optionByName.get(name)} className="size-5" />
+                <ProviderLogo key={name} option={optionByName.get(name)} className={compact ? "size-4" : "size-5"} />
               ))}
               {extraCount > 0 ? (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                <span className={cn("rounded-full bg-muted text-muted-foreground", compact ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-xs")}>
                   +{extraCount}
                 </span>
               ) : null}
             </span>
           )}
-          <ChevronDown className="size-4 text-muted-foreground" />
+          <ChevronDown className={cn("text-muted-foreground", compact ? "size-3" : "size-4")} />
         </div>
       </Button>
 
       {open ? (
-        <div className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-gold/30 bg-background shadow-xl">
+        <div className={cn("absolute left-0 z-50 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-gold/30 bg-background shadow-xl", dropdownDirection === "up" ? "bottom-full mb-2" : "mt-2")}>
           <div className="max-h-[320px] overflow-y-auto py-2 scrollbar-styled">
             <FilterRow
               label="All services"

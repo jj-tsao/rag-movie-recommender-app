@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User, AuthChangeEvent } from "@supabase/supabase-js";
 import type { TablesInsert } from "@/types/supabase";
-import { getAppUser, getCurrentSession, onAuthStateChange, upsertAppUser } from "../api";
+import { getCurrentSession, onAuthStateChange, upsertAppUser } from "../api";
+import { useAppUser } from "./useAppUser";
 
 type AuthState = {
   user: User | null;
@@ -12,12 +14,14 @@ type AuthState = {
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({ user: null, session: null, loading: true, lastEvent: null });
+  const queryClient = useQueryClient();
 
   async function refresh() {
     const session = await getCurrentSession();
     setState((s) => ({ ...s, session, user: session?.user ?? null, loading: false }));
   }
 
+  // Effect 1: bootstrap session + listen for auth changes
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -35,68 +39,55 @@ export function useAuth() {
     };
   }, []);
 
+  // Query app_user profile (deduplicated + cached via React Query)
+  const userId = !state.loading ? state.user?.id : undefined;
+  const { data: appUser, isSuccess: appUserReady } = useAppUser(userId);
+
+  // Effect 2: ensure app_user profile exists + handle pending display name
+  const didSync = useRef(false);
   useEffect(() => {
-    let cancelled = false;
+    if (!state.user || state.loading || !appUserReady || didSync.current) return;
+    didSync.current = true;
+
     (async () => {
-      if (!state.user || state.loading) return;
       try {
-        const existing = await getAppUser(state.user.id);
-        if (cancelled) return;
-        if (!existing) {
+        const pending = localStorage.getItem("pendingDisplayName");
+
+        if (!appUser || (!appUser.display_name && pending)) {
           const cleanEmail =
-            typeof state.user.email === "string" && state.user.email.trim().length > 0
-              ? state.user.email.trim()
+            typeof state.user!.email === "string" && state.user!.email.trim().length > 0
+              ? state.user!.email.trim()
               : null;
           const payload: TablesInsert<"app_user"> = {
-            user_id: state.user.id,
+            user_id: state.user!.id,
             email: (cleanEmail ?? null) as unknown as string,
           };
-          const displayName = state.user.user_metadata?.display_name;
+          const displayName = pending || state.user!.user_metadata?.display_name;
           if (typeof displayName === "string" && displayName.trim().length > 0) {
             payload.display_name = displayName.trim();
           }
           await upsertAppUser(payload);
+          queryClient.invalidateQueries({ queryKey: ["app_user", state.user!.id] });
+        }
+
+        if (pending) {
+          try {
+            localStorage.setItem(`profileDisplayName:${state.user!.id}`, pending);
+          } catch {
+            // no-op
+          }
+          localStorage.removeItem("pendingDisplayName");
         }
       } catch (error) {
         console.warn("Failed to ensure app_user profile", error);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [state.user?.id, state.user?.email, state.user?.user_metadata, state.loading]);
+  }, [state.user?.id, state.loading, appUserReady, appUser]);
 
-  // On first authenticated load, if we have a pending display name from sign up,
-  // upsert the app_user profile and clear the pending value.
+  // Reset sync guard when user changes
   useEffect(() => {
-    (async () => {
-      if (!state.user || state.loading) return;
-      try {
-        const pending = localStorage.getItem("pendingDisplayName");
-        if (!pending) return;
-        const existing = await getAppUser(state.user.id);
-        if (!existing || !existing.display_name) {
-          const cleanEmail =
-            typeof state.user.email === "string" && state.user.email.trim().length > 0
-              ? state.user.email.trim()
-              : null;
-          await upsertAppUser({
-            user_id: state.user.id,
-            email: (cleanEmail ?? null) as unknown as string,
-            display_name: pending,
-          });
-        }
-        try {
-          localStorage.setItem(`profileDisplayName:${state.user.id}`, pending);
-        } catch (e) {
-          void e; // no-op
-        }
-        localStorage.removeItem("pendingDisplayName");
-      } catch (e) {
-        void e; // no-op
-      }
-    })();
-  }, [state.user?.id, state.user, state.loading]);
+    didSync.current = false;
+  }, [state.user?.id]);
 
   return state;
 }
