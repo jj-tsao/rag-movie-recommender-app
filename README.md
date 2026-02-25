@@ -1,4 +1,4 @@
-# 🎬 Reelix AI – Personalized Movie & TV Discovery Agent
+# Reelix AI – Personalized Movie & TV Discovery Agent
 
 **Reelix** is an AI-native discovery agent that understands *vibes* and turns them into cinematic picks.
 
@@ -20,12 +20,14 @@ Reelix finds your next favorite watch by learning your preferred **vibes** (them
 
 Architecturally, Reelix is an **AI-native discovery agent** built on top of a modern **hybrid recommendation system**. A small team of collaborating agents sits above hybrid retrieval, multi-step reranking, and LLM-based curator scoring and explainability.
 
-Under the hood, Reelix is a three-agent system (Orchestrator → Curator → Explanation) with a sophisticated recommendation pipeline:
+Under the hood, Reelix is a four-agent system (Orchestrator → Curator → Reflection → Explanation) with a sophisticated recommendation pipeline:
 
-- **Agentic workflow (3 collaborating agents)**
+- **Agentic workflow (4 collaborating agents)**
   - **Orchestrator Agent** — parses user queries + recent context, infers intent, generates a fast opening summary, and keeps a structured plan (retrieval shape, filters, personalization inputs, etc.) and short-term session memory alive across multi-turn interactive iterations. Calls the recommendation tool to execute the plan.
 
   - **Curator Agent** — evaluates candidates on genre/tone/theme/structure fit using parallel LLM calls (multiple batches for reduced latency), tiers them (strong_match, moderate_match, no_match), and applies selection logic to produce final recommendations.
+
+  - **Reflection Agent** — analyzes the curated slate to propose concrete next-step suggestions (e.g., "Want to explore 70s paranoid thrillers with that same tone?"). Persists the suggestion to session memory to enable fluid multi-turn follow-ups and discovery.
 
   - **Explanation Agent** — takes the ranked slate + taste profile and generates grounded "Why you might enjoy it" rationales, streaming them to the UI and writing them to Supabase + Redis as logged signals for reuse, taste profile updates, offline analysis, and model / ranking retraining.
 
@@ -52,7 +54,7 @@ The result is a fast, AI-led natural language **“Explore by Vibe”** and **Fo
 
 
 ---
-## ✨ Core Experiences
+## Core Experiences
 
 - **Agent-Powered Discovery (`/explore`)**
   Type "psychological thrillers with a satirical tone on Netflix". The **Orchestrator Agent** parses your natural-language vibe, generates a fast opening summary, builds a structured plan, and calls the **Recommendation Pipeline** → **Curator Agent** → **Explanation Agent** to stream back grounded, vibe-matched recommendations.
@@ -74,9 +76,9 @@ The result is a fast, AI-led natural language **“Explore by Vibe”** and **Fo
 
 ---
 
-## 🧠 Architecture - Agentic Workflow and Recommendation Pipeline
+## Architecture - Agentic Workflow and Recommendation Pipeline
 
-At runtime, Reelix is a **three-agent system** (Orchestrator → Curator → Explanation) with a sophisticated recommendation engine:
+At runtime, Reelix is a **four-agent system** (Orchestrator → Curator → Reflection → Explanation) with a sophisticated recommendation engine:
 
 ```text
   Taste Signals ─▶ Taste Vector ───┐
@@ -96,6 +98,13 @@ At runtime, Reelix is a **three-agent system** (Orchestrator → Curator → Exp
                                  │
                                  ├─ Persist session memory on Redis
                                  ├─ SSE: recs (slate + metadata) ──────▶ UI
+                                 │
+                                 ▼
+                         Reflection Agent (analyze slate → propose next step)
+                                 │  (reads previous strategy from session; constrains LLM to alternate)
+                                 │
+                                 ├─ SSE: next_steps ───────────────────▶ UI
+                                 ├─ Persist suggestion + strategy → session memory (Redis)
                                  │
                                  ▼
                          Explanation Agent ("why" write-up → stream JSONL)
@@ -192,29 +201,60 @@ This agent evaluates candidates from the recommendation pipeline using LLM reaso
   - Returns curated slate to orchestrator for SSE streaming to UI
 
 
-### 4) Explanation Agent
+### 4) Reflection Agent
 
-**Reasoning & explanation** — *"Why these, and what next?"*
+**Next-step guidance** — *”Where should we explore next?”*
+
+After each recommendation turn, the Reflection Agent analyzes the curated slate and proposes a concrete next direction to guide continued discovery. It runs before the Explanation Agent for lower latency — the next-step suggestion is fast (single short LLM call) and streams to the UI while the heavier explanation generation follows.
+
+- **Runs post-curator, best-effort**
+  - Executes only in RECS mode, after curator evaluations
+  - Streams an SSE `next_steps` event with strategy and suggestion text
+  - 10-second timeout with graceful degradation — never blocks the main response
+
+- **Four mutually exclusive strategies** (picks one per turn)
+  - `more_like_title`: Picks a standout title from results and proposes exploring what makes it special (sub-genre, tone, setting, style)
+  - `explore_adjacent`: Identifies a recurring keyword/theme across results and proposes a sideways pivot into a related angle
+  - `flip_tone`: The results lean toward one emotional register. Propose the same themes or genre but in a different tone
+  - `shift_era`: Detects temporal clustering and proposes a specific different decade
+
+- **Strategy alternation across turns**
+  - Persists the chosen strategy as `last_reflection_strategy` in session state (Redis)
+  - Ensures diverse suggestions across a multi-turn session rather than defaulting to one strategy
+
+- **Session memory integration for multi-turn flow**
+  - Persists suggestion as `last_admin_message` in session state (Redis)
+  - On the next turn, the orchestrator recognizes short affirmations (“yes”, “sure”, “let's go”) and auto-advances the suggestion into a new recommendation query
+  - Enables fluid, conversational discovery without requiring users to rephrase
+
+- **Full instrumentation**
+  - All attempts (success/timeout/error) logged to `reflection_logs` table with strategy, suggestion, latency, token counts, and tier stats
+  - Key files: `reflection_agent.py`, `reflection_prompts.py`
+
+
+### 5) Explanation Agent
+
+**Reasoning & explanation** — *”Why these, and what next?”*
 
 - **Consumes**
   - Ranked slate from the **Recommendation Pipeline** and **Curator Agent**
   - The user's taste profile and recent interactions
   - The current mode (Explore by Vibe vs. For-You)
 
-- **Builds structured prompts to**  
-  - Generate “**Why you might enjoy it**” copy per title  
-  - Avoid self-references or hallucinations  
+- **Builds structured prompts to**
+  - Generate “**Why you might enjoy it**” copy per title
+  - Avoid self-references or hallucinations
   - Produce markdown-friendly output for movie cards
 
-- **Runs in parallel with UI rendering**  
+- **Runs in parallel with UI rendering**
   - Kicks off as soon as the slate is available, while the UI is already showing cards and skeletons.
 
-- **Streams results via SSE / JSONL**  
-  - Incremental `why_delta` events per `media_id` → `done`  
+- **Streams results via SSE / JSONL**
+  - Incremental `why_delta` events per `media_id` → `done`
   - Inserts the final “why” copy and associated metadata to Redis Supabase for cache and analysis
 
 
-### 5) Signals, feedback loops & taste updates
+### 6) Signals, feedback loops & taste updates
 
 The system maintains comprehensive logging across two layers for analysis, debugging, and continuous improvement:
 
@@ -226,6 +266,7 @@ The system maintains comprehensive logging across two layers for analysis, debug
 - **`agent_decisions`** - Orchestrator decisions (mode routing, RecQuerySpec generation, LLM usage, latency)
 - **`curator_evaluations`** - Per-candidate fit scores (genre_fit, tone_fit, theme_fit, structure_fit, tier, is_served, final_rank)
 - **`tier_summaries`** - Aggregate statistics (strong/moderate/no_match counts, selection_rule applied, curator latency)
+- **`reflection_logs`** - Reflection agent attempts (strategy, suggestion, status, latency, token counts, tier context)
 
 #### Feedback Loop Integration
 - **User interactions** (Love/Like/Dislike, ratings, watchlist actions, trailer views) logged to Supabase
@@ -242,7 +283,7 @@ Over time, these feedback loops turn Reelix into a richer **discovery agent**, n
 
 ---
 
-## 🌐 Key API Endpoints
+## Key API Endpoints
 
 ### Discovery Endpoints
 
@@ -251,11 +292,12 @@ Agent-powered conversational search with streaming SSE responses.
 
 1) `POST /discovery/explore`
    - Orchestrator Agent parses natural language query and builds RecQuerySpec
-   - Streams SSE events: `started` → `opening` → `recs` → `done`
+   - Streams SSE events: `started` → `opening` → `recs` → `next_steps` → `done`
    - Opening summary is generated upfront for fast UI paint
    - Executes recommendation pipeline → curator agent in background
    - Returns final recommendations with why URL for explanations
-   - Logs orchestrator decisions, curator evaluations, and tier summaries
+   - Reflection Agent proposes a next-step suggestion for multi-turn discovery
+   - Logs orchestrator decisions, curator evaluations, tier summaries, and reflection attempts
 
 2) `GET /discovery/explore/why?query_id=...` (SSE)
    - Explanation Agent generates personalized "why" rationales
@@ -347,7 +389,7 @@ Analytics and logging endpoints for tracking recommendation performance and cach
    - Writes to Supabase for offline analysis and A/B testing
 
 ---
-## 🏗️ Recommendation Pipeline Architecture (High‑Level)
+## Recommendation Pipeline Architecture (High‑Level)
 
 ```
 User Interactions ──▶ Taste Vector (Long term memory)
@@ -404,11 +446,19 @@ User Interactions ──▶ Taste Vector (Long term memory)
                             UI (streaming SSE)
                                     │
                                     ▼
+                          Reflection Agent (LLM)
+                      (propose next-step suggestion)
+                                    │
+                                    ▼
+                        UI (next_steps SSE event)
+                        + Session Memory (Redis)
+                                    │
+                                    ▼
                          Explanation Agent (LLM)
                      (generate "why" for each item)
                                     │
                                     ▼
-                             UI (streaming SSE)                     
+                             UI (streaming SSE)
 
 ```
 
@@ -422,7 +472,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 - Tiering criteria: dynamic `final_recs` counta from each tier
 
 ---
-## 🚀 Tech Stack
+## Tech Stack
 
 | Layer        | Tech                     |
 |-------------|--------------------------|
@@ -444,7 +494,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 
 ---
 
-## 📚 Sample Query Flow
+## Sample Query Flow
 
 1. User enters a vibe-based prompt (e.g., _"Mind-bending sci-fi with existential themes on Netlfix from the past 5 years"_)
 2. Orchestrator Agent determines mode (CHAT vs RECS) and generates opening summary
@@ -454,13 +504,15 @@ User Interactions ──▶ Taste Vector (Long term memory)
 6. Multi-stage ranking: metadata scorer + cross-encoder reranking
 7. Curator Agent evaluates candidates in 2 parallel batches on genre/tone/theme/structure fit
 8. Tier-based selection produces final recommendations
-9. Explanation Agent streams personalized "why" rationales via SSE
-10. UI displays cards with posters, ratings, metadata, rationale, and trailer links
-11. All decisions logged to Supabase (orchestrator, curator, pipeline, explanations)
+9. Reflection Agent analyzes the slate and streams a next-step suggestion (e.g., "Want to explore 70s paranoid sci-fi with that same vibe?")
+10. Suggestion and strategy persisted to session memory — user can say "yes" to auto-advance into a new search
+11. Explanation Agent streams personalized "why" rationales via SSE
+12. UI displays cards with posters, ratings, metadata, rationale, and trailer links
+13. All decisions logged to Supabase (orchestrator, curator, pipeline, explanations, reflection)
 
 ---
 
-## 📈 Metrics
+## Metrics
 
 **Sentence Transformer Retriever Model:**
 
@@ -497,7 +549,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 
 ---
 
-## 📦 Repository Structure
+## Repository Structure
 
 This is a **pnpm monorepo** using **Turborepo**:
 - **apps/api** - FastAPI backend (Python 3.11+, managed with `uv`)
@@ -531,9 +583,6 @@ export REDIS_URL=...
 
 # Run API server
 uvicorn app.main:app --reload --port 7860
-
-# Skip model loading for faster startup during development
-REELIX_SKIP_RECOMMENDER_INIT=1 uvicorn app.main:app --reload --port 7860
 ```
 
 ### Frontend (apps/web)
@@ -546,5 +595,5 @@ pnpm typecheck            # Type check
 
 ---
 
-## 📝 License
+## License
 MIT
