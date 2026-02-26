@@ -11,7 +11,7 @@ from reelix_agent.core.types import LlmDecision
 
 if TYPE_CHECKING:
     from reelix_agent.orchestrator.agent_state import AgentState
-    from reelix_llm.client import LlmClient
+    from reelix_core.llm_client import LlmClient
 
 
 class LlmUsage:

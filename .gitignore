@@ -10,8 +10,16 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pytest_cache
+.pytest_cache/
 *.egg-info/
+.ruff_cache/
+.uv-cache/
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # Envs
 .env
@@ -22,12 +30,16 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+*.code-workspace
 
 # Claude Code
 .claude/
 
 # Turbo cache
 .turbo
+
+# Local CI / debug artifacts
+.ci_logs/
 
 # Test files
 test_first_recommendation.py

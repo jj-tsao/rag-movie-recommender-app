@@ -15,11 +15,11 @@ from reelix_agent.core.types import PromptsEnvelope
 from reelix_recommendation.orchestrator import orchestrate
 
 from app.deps.deps import (
-    get_chat_completion_llm,
     get_recipe_registry,
     get_recommend_pipeline,
     get_logger,
 )
+from app.deps.deps_llm import get_chat_completion_llm
 from app.deps.supabase_client import (
     get_current_user_id,
     get_user_context_service,

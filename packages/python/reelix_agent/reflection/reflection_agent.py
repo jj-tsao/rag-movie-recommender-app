@@ -12,7 +12,7 @@ from reelix_agent.reflection.reflection_prompts import (
 )
 
 if TYPE_CHECKING:
-    from reelix_llm.client import LlmClient
+    from reelix_core.llm_client import LlmClient
     from reelix_ranking.types import Candidate
 
 log = logging.getLogger(__name__)

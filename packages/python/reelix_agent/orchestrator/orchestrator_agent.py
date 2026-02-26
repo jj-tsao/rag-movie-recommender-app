@@ -18,7 +18,7 @@ from reelix_agent.core.types import (
 from reelix_agent.orchestrator.agent_rec_runner import AgentRecRunner
 from reelix_agent.orchestrator.agent_state import AgentState
 from reelix_agent.tools import ToolContext, ToolRegistry, ToolRunner
-from reelix_llm.client import LlmClient
+from reelix_core.llm_client import LlmClient
 
 MEMORY_RE = re.compile(r"<MEMORY>\s*(.*?)\s*</MEMORY>", re.DOTALL)
 

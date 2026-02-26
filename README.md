@@ -564,7 +564,6 @@ This is a **pnpm monorepo** using **Turborepo**:
 pnpm install              # Install all dependencies
 pnpm dev                  # Run all services via Turborepo
 pnpm build                # Build all packages
-pnpm generate             # Regenerate TypeScript SDK from OpenAPI spec
 ```
 
 ### Backend (apps/api)

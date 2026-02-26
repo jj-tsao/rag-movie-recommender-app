@@ -23,4 +23,3 @@ numpy
 
 # Local packages
 -e ../../packages/python
--e ../../packages/py-sdk

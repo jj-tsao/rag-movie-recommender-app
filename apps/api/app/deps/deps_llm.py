@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from reelix_llm.client import LlmClient
+from reelix_core.llm_client import LlmClient
 
 
 @lru_cache(maxsize=1)

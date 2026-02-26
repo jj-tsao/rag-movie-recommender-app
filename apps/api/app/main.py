@@ -67,8 +67,6 @@ def _init_recommendation_stack(app: FastAPI) -> None:
     from reelix_retrieval.query_encoder import Encoder
     from reelix_agent.orchestrator.agent_rec_runner import AgentRecRunner
     from reelix_recommendation.recipes import InteractiveRecipe, ForYouFeedRecipe
-    from openai import OpenAI
-    from reelix_models.llm_completion import OpenAIChatLLM
     from reelix_agent.tools import build_registry, ToolRunner
 
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -95,11 +93,6 @@ def _init_recommendation_stack(app: FastAPI) -> None:
     embed_model = load_sentence_model()
     bm25_models, bm25_vocabs = load_bm25_files()
     query_encoder = Encoder(embed_model, bm25_models, bm25_vocabs)
-    openai_client = OpenAI(api_key=app.state.settings.openai_api_key)
-    chat_completion_llm = OpenAIChatLLM(
-        openai_client, request_timeout=60.0, max_retries=2
-    )
-
     app.state.qdrant = QdrantClient(
         url=app.state.settings.qdrant_endpoint,
         api_key=app.state.settings.qdrant_api_key,
@@ -124,8 +117,6 @@ def _init_recommendation_stack(app: FastAPI) -> None:
         "for_you_feed": ForYouFeedRecipe(query_encoder=app.state.query_encoder),
         "interactive": InteractiveRecipe(query_encoder=app.state.query_encoder),
     }
-    app.state.chat_completion_llm = chat_completion_llm
-
     # == Initialize agent Tool Infrastructure ==
 
     app.state.tool_registry = build_registry()

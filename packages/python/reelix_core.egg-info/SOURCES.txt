@@ -13,6 +13,9 @@ reelix_agent/orchestrator/agent_state.py
 reelix_agent/orchestrator/orchestrator_agent.py
 reelix_agent/orchestrator/orchestrator_prompts.py
 reelix_agent/orchestrator/session_memory.py
+reelix_agent/reflection/__init__.py
+reelix_agent/reflection/reflection_agent.py
+reelix_agent/reflection/reflection_prompts.py
 reelix_agent/tools/__init__.py
 reelix_agent/tools/default_registry.py
 reelix_agent/tools/recommendation_tool.py

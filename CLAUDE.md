@@ -18,8 +18,6 @@ This is a pnpm monorepo using Turborepo:
 - **apps/web** - React frontend (Vite + TypeScript + Tailwind)
 - **apps/data-pipeline** - ETL + embedding + Qdrant indexing pipeline (Python 3.11+, managed with `uv`)
 - **packages/python** - Shared Python packages (reelix_agent, reelix_core, reelix_ranking, reelix_retrieval, etc.)
-- **packages/js/ts-sdk** - TypeScript SDK generated from OpenAPI spec via Orval
-- **packages/py-sdk** - Python SDK for API client
 
 ## Development Commands
 
@@ -30,7 +28,6 @@ pnpm dev                  # Run all services via Turborepo
 pnpm build                # Build all packages
 pnpm lint                 # Lint all packages
 pnpm typecheck            # Type check all packages
-pnpm generate             # Regenerate TypeScript SDK from OpenAPI spec
 ```
 
 ### Frontend (apps/web)
@@ -259,25 +256,10 @@ OMDB_API_KEY=
 DATABASE_URL=          # PostgreSQL connection string
 ```
 
-## TypeScript SDK Generation
-
-The frontend uses a generated TypeScript SDK from the OpenAPI spec:
-```bash
-# From root
-pnpm generate
-
-# Or directly
-cd packages/js/ts-sdk
-pnpm generate
-```
-
-The spec lives in `packages/schemas/openapi.yaml`.
-
 ## Python Package Dependencies
 
 Both `apps/api` and `apps/data-pipeline` depend on shared packages via `uv` editable installs:
 - `reelix-core` from `packages/python` (config, types, shared constants)
-- `reelix-discovery-agent-api-client` from `packages/py-sdk` (API only)
 
 The data pipeline imports from shared packages for the encoding contract:
 - `reelix_core.config` — collection names, model names, vector dimensions

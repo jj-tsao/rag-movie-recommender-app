@@ -35,7 +35,7 @@ from app.deps.supabase_client import (
     get_current_user_id,
     get_user_context_service,
 )
-from app.agent.session_memory_service import upsert_session_memory
+from app.services.session_memory import upsert_session_memory
 from app.infrastructure.cache.ticket_store import Ticket
 from app.schemas import InteractiveRequest, ExploreRerunRequest
 

@@ -6,7 +6,6 @@ dependencies = [
   "fastapi",
   "uvicorn[standard]",
   "pydantic-settings",
-  "reelix-discovery-agent-api-client",
   "reelix-core",
   "qdrant-client",
   "supabase>=2.7.4",
@@ -20,13 +19,12 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-"reelix-discovery-agent-api-client" = { path = "../../packages/py-sdk", editable = true }
 "reelix-core" = { path = "../../packages/python", editable = true }
 
 [dependency-groups]
 dev = [
     "black>=25.1.0",
-    "openapi-python-client>=0.26.0",
+
     "pre-commit>=4.3.0",
     "pytest>=8.4.2",
     "ruff>=0.12.12",

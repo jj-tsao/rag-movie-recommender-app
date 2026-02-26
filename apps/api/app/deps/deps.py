@@ -7,13 +7,11 @@ from reelix_agent.orchestrator.agent_rec_runner import AgentRecRunner
 
 if TYPE_CHECKING:
     from reelix_logging.rec_logger import TelemetryLogger
-    from reelix_models.llm_completion import OpenAIChatLLM
     from reelix_recommendation.recommend import RecommendPipeline
     from reelix_retrieval.query_encoder import Encoder
 else:
     RecommendPipeline = Any  # type: ignore
     Encoder = Any  # type: ignore
-    OpenAIChatLLM = Any  # type: ignore
     TelemetryLogger = Any  # type: ignore
 
 
@@ -86,17 +84,6 @@ class RecipeRegistry:
 
 def get_recipe_registry(request: Request) -> RecipeRegistry:
     return RecipeRegistry(request.app.state.recipes)
-
-
-def get_chat_completion_llm(request: Request) -> OpenAIChatLLM:
-    return cast(
-        OpenAIChatLLM,
-        _get_state_attr(
-            request,
-            "chat_completion_llm",
-            "Chat completion llm not initialized",
-        ),
-    )
 
 
 def get_interactive_stream_fn(request: Request) -> Callable:

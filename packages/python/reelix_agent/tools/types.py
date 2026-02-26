@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 if TYPE_CHECKING:
     from reelix_agent.orchestrator.agent_rec_runner import AgentRecRunner
     from reelix_agent.orchestrator.agent_state import AgentState
-    from reelix_llm.client import LlmClient
+    from reelix_core.llm_client import LlmClient
 else:
     AgentRecRunner = Any
     AgentState = Any

@@ -1,6 +1,6 @@
 from reelix_core.types import UserSignals
 from reelix_ranking.types import Candidate
-from reelix_llm.client import LlmClient
+from reelix_core.llm_client import LlmClient
 from reelix_agent.core.types import RecQuerySpec
 
 from .curator_prompts import CURATOR_PROMPT_S, build_curator_user_prompt
