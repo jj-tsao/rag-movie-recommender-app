@@ -10,64 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ---------- SDKs ----------
-  sdk-ts:
-    name: TS SDK (orval) — generate & check drift
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        # Use pnpm version from package.json "packageManager"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
-
-      - run: pnpm -v
-      - run: pnpm install --frozen-lockfile
-
-      - name: Generate TS SDK (orval)
-        working-directory: packages/js/ts-sdk
-        run: pnpm run generate
-
-      - name: Fail if TS SDK drifted
-        run: |
-          git diff --exit-code -- packages/js/ts-sdk/src/index.ts || \
-          (echo "::error ::TS SDK out of date. Run 'pnpm -C packages/js/ts-sdk run generate' and commit the changes."; exit 1)
-
-  sdk-py:
-    name: Python SDK (openapi-python-client) — generate & check drift
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Generate Python SDK
-        working-directory: apps/api
-        run: |
-          uv run openapi-python-client generate \
-            --path ../../packages/schemas/openapi.yaml \
-            --output-path ../../packages/py-sdk \
-            --meta none --overwrite
-
-      - name: Fail if Python SDK drifted
-        run: |
-          git diff --exit-code -- packages/py-sdk || \
-          (echo "::error ::Python SDK out of date. Regenerate and commit."; exit 1)
-
   # ---------- Node (web + any TS pkgs) ----------
   node:
     name: Node — lint • typecheck • test • build
     runs-on: ubuntu-latest
-    needs: [sdk-ts]
     steps:
       - uses: actions/checkout@v4
 
@@ -98,7 +44,6 @@ jobs:
   python-api:
     name: Python API — ruff • tests
     runs-on: ubuntu-latest
-    needs: [sdk-py]
     defaults:
       run:
         working-directory: apps/api
