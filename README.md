@@ -14,16 +14,16 @@
 
 ---
 
-**Reelix** is an AI-native movie discovery agent that understands your preferred *vibes* and evolving taste, and turns them into cinematic picks just for you.
+**Reelix** is an AI-native movie discovery agent that understands your nuanced preferences and evolving taste, and turns them into cinematic picks just for you.
 
-Under the hood, Reelix is a multi-agent system with four collaborating AI agents that handle intent understanding and planning, candidate curation, next-step guidance, and fit explanations:
+Under the hood, Reelix is a multi-agent system with four collaborating AI agents spanning intent understanding & planning, candidate curation, next-step guidance, and fit explanations:
 
-- **Orchestrator** — parses queries, builds a structured retrieval plan, and manages multi-turn session memory
-- **Curator** — scores candidates on genre/tone/theme/structure fit via parallel LLM evaluation
-- **Reflection** — proposes a concrete next-step direction after each recommendation turn
-- **Explanation** — streams personalized “why you’ll enjoy it” rationales to the UI
+- **Orchestrator Agent**: parses queries, builds a structured retrieval plan, and manages multi-turn session memory
+- **Curator Agent**: scores candidates on genre/tone/theme/structure fit via parallel LLM evaluation
+- **Reflection Agent**: proposes a concrete next-step direction after each recommendation turn
+- **Explanation Agent**: streams personalized “why you’ll enjoy it” rationales to the UI
 
-The agents are backed by a **hybrid recommendation pipeline** (dense + sparse retrieval, multi-step reranking) and an evolving **user taste vector** built from interactions and reactions.
+The agents are backed by a hybrid recommendation pipeline (dense + sparse retrieval, multi-step reranking) and a user taste vector that evolves with every rating, reaction, and refinement.
 
 ---
 ## Core Experiences
