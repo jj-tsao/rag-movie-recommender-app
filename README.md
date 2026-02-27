@@ -1,6 +1,4 @@
-# Reelix AI – Personalized Movie & TV Discovery Agent
-
-**Reelix** is an AI-native discovery agent that understands *vibes* and turns them into cinematic picks.
+# Reelix AI – Personalized Movie Discovery Agent
 
 [![Netlify](https://img.shields.io/badge/Live%20Site-Netlify-42b883?logo=netlify)](https://reelixai.netlify.app/)
 [![Retriever Model](https://img.shields.io/badge/Retriever%20Model-HuggingFace-blue?logo=huggingface)](https://huggingface.co/JJTsao/fine-tuned_movie_retriever-bge-base-en-v1.5)
@@ -16,57 +14,31 @@
 
 ---
 
-Reelix finds your next favorite watch by learning your preferred **vibes** (themes, tone, genres, pacing), evolving **taste**, and **personal preferences**.
+**Reelix** is an AI-native movie discovery agent that understands your preferred *vibes* and evolving taste, and turns them into cinematic picks just for you.
 
-Architecturally, Reelix is an **AI-native discovery agent** built on top of a modern **hybrid recommendation system**. A small team of collaborating agents sits above hybrid retrieval, multi-step reranking, and LLM-based curator scoring and explainability.
+Under the hood, Reelix is a multi-agent system with four collaborating AI agents that handle intent understanding and planning, candidate curation, next-step guidance, and fit explanations:
 
-Under the hood, Reelix is a four-agent system (Orchestrator → Curator → Reflection → Explanation) with a sophisticated recommendation pipeline:
+- **Orchestrator** — parses queries, builds a structured retrieval plan, and manages multi-turn session memory
+- **Curator** — scores candidates on genre/tone/theme/structure fit via parallel LLM evaluation
+- **Reflection** — proposes a concrete next-step direction after each recommendation turn
+- **Explanation** — streams personalized “why you’ll enjoy it” rationales to the UI
 
-- **Agentic workflow (4 collaborating agents)**
-  - **Orchestrator Agent** — parses user queries + recent context, infers intent, generates a fast opening summary, and keeps a structured plan (retrieval shape, filters, personalization inputs, etc.) and short-term session memory alive across multi-turn interactive iterations. Calls the recommendation tool to execute the plan.
-
-  - **Curator Agent** — evaluates candidates on genre/tone/theme/structure fit using parallel LLM calls (multiple batches for reduced latency), tiers them (strong_match, moderate_match, no_match), and applies selection logic to produce final recommendations.
-
-  - **Reflection Agent** — analyzes the curated slate to propose concrete next-step suggestions (e.g., "Want to explore 70s paranoid thrillers with that same tone?"). Persists the suggestion to session memory to enable fluid multi-turn follow-ups and discovery.
-
-  - **Explanation Agent** — takes the ranked slate + taste profile and generates grounded "Why you might enjoy it" rationales, streaming them to the UI and writing them to Supabase + Redis as logged signals for reuse, taste profile updates, offline analysis, and model / ranking retraining.
-
-- **Recommendation Pipeline (Tool)**
-  - Executes the orchestrator's plan with a **RAG-based, hybrid retrieval pipeline**: dense + sparse (BM25) retrieval over the catalog, fusion, metadata/cross-encoder reranking to produce candidates, then calls the curator agent for final evaluation and selection.
-
-  - **Hybrid retrieval engine**  
-    - **Query encoding & expansion** — take natural-language vibe queries (“neo-noir psychological thriller”, “slow-burn sci-fi drama”) and turn them into dense + sparse signals (embeddings, BM25 terms).  
-    - **Dense** — fine-tuned SentenceTransformers (`bge-base-en-v1.5`) over titles, synopsis, and curated metadata.  
-    - **Sparse** — BM25 over cleaned text for lexical precision and long-tail matches.  
-    - **Fusion** — ANN over dense vectors + BM25 ranked lists, combined with RRF / weighted fusion to build a robust candidate set.
-
-  - **Multi-stage ranking (multi-objective)**  
-    - A **metadata-aware scorer** combines content quality, popularity, freshness, and diversity / de-dupe objectives.  
-    - An optional **cross-encoder reranker** re-scores a small window (e.g. top-20) for precise final ordering.  
-    - **LLM-assisted vibe matching** (narrow pass) — an LLM score is blended into ranking for a small candidate pool, improving alignment to the user’s free-form vibe.
-
-- **Personalization**  
-  - A **user taste vector** built from interactions (love / like / dislike, star ratings, watchlist, trailer watch, etc.).  
-  - Cold-start behavior falls back to content-centric priors (global popularity / quality) plus explicit user preference signals (genres, services, etc.).
-
-
-The result is a fast, AI-led natural language **“Explore by Vibe”** and **For-You feed** experience that **adapts** in real time as users interact.
-
+The agents are backed by a **hybrid recommendation pipeline** (dense + sparse retrieval, multi-step reranking) and an evolving **user taste vector** built from interactions and reactions.
 
 ---
 ## Core Experiences
 
-- **Agent-Powered Discovery (`/explore`)**
-  Type "psychological thrillers with a satirical tone on Netflix". The **Orchestrator Agent** parses your natural-language vibe, generates a fast opening summary, builds a structured plan, and calls the **Recommendation Pipeline** → **Curator Agent** → **Explanation Agent** to stream back grounded, vibe-matched recommendations.
+- **Explore by Vibe (`/explore`)**
+  Type a vibe — “psychological thrillers with a satirical tone on Netflix” — and get a curated slate with streaming rationales explaining why each pick fits, plus a next-step suggestion to keep exploring.
 
 - **Taste Onboarding (`/taste`)**
-  Quickly signal your preferences (genre / vibe picks; Love / Like / Dislike). The agents use this to initialize your **user taste vector**, which the Orchestrator Agent pulls into every subsequent plan and refines as you give more feedback.
+  Pick genres and vibes, react to titles (Love / Like / Not for me), and the system builds a taste profile that sharpens every recommendation going forward.
 
 - **For-You Feed (`/discover`)**
-  A personalized grid of picks generated by the same multi-agent workflow. The agent leans more heavily on your **taste history**; each card streams a short "Why you might enjoy it" rationale from the Explanation Agent, powered by ranked context from the Recommendation Pipeline and Curator Agent.
+  A personalized grid of picks that leans on your taste history. Each card streams a short “Why you might enjoy it” write-up as it loads.
 
-- **Add to Watchlist (`/watchlist`)**  
-  Save titles to watch later, flip to “Watched,” and (optionally) rate 1–10 — all in one flow. Optimistic UI + idempotent API; every interaction emits **logged signals** that update your taste vector and feed into future agent plans, offline analysis, and model / ranking improvements.
+- **Watchlist (`/watchlist`)**
+  Save titles, mark as watched, rate 1–10 — every interaction feeds back into your taste profile and future recommendations.
 
 ### Quick Look
 
@@ -467,9 +439,9 @@ User Interactions ──▶ Taste Vector (Long term memory)
 - Retrieval depths: `dense_depth`, `sparse_depth`
 - Fusion: `rrf_k`
 - Metadata weights: `{dense, sparse, rating, popularity, recency, genre}`
-- Curatror pass size: `top-k`
+- Curator pass size: `top-k`
 - Curator dimensions: `genre_fit`, `tone_fit`, `theme_fit`, `structure_fit`
-- Tiering criteria: dynamic `final_recs` counta from each tier
+- Tiering criteria: dynamic `final_recs` count from each tier
 
 ---
 ## Tech Stack
@@ -496,7 +468,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 
 ## Sample Query Flow
 
-1. User enters a vibe-based prompt (e.g., _"Mind-bending sci-fi with existential themes on Netlfix from the past 5 years"_)
+1. User enters a vibe-based prompt (e.g., _"Mind-bending sci-fi with existential themes on Netflix from the past 5 years"_)
 2. Orchestrator Agent determines mode (CHAT vs RECS) and generates opening summary
 3. Opening summary streams to UI immediately for fast feedback
 4. RecQuerySpec is constructed with filters, genres, tone, themes
