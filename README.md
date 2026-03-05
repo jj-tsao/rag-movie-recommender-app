@@ -73,7 +73,7 @@ At runtime, Reelix is a **four-agent system** (Orchestrator → Curator → Refl
                                  │
                                  ▼
                          Reflection Agent (analyze slate → propose next step)
-                                 │  (reads previous strategy from session; constrains LLM to alternate)
+                                 │  (soft weighted next step strategy selection)
                                  │
                                  ├─ SSE: next_steps ───────────────────▶ UI
                                  ├─ Persist suggestion + strategy → session memory (Redis)
