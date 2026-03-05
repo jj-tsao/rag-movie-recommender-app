@@ -44,7 +44,7 @@ The agents are backed by a hybrid recommendation pipeline (dense + sparse retrie
 
 > Reelix understands your vibe and curates markdown-rich suggestions, trailers, and rationale in real time.
 
-<img width="1050" height="890" alt="Image" src="https://github.com/user-attachments/assets/f900b15b-431b-4d0c-8135-0d1bce473c00" />
+<img width="1061" height="1065" alt="Image" src="https://github.com/user-attachments/assets/99219ff0-2fa9-4c08-843b-3a49efbeaa71" />
 
 ---
 
