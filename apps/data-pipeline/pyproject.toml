@@ -6,7 +6,7 @@ dependencies = [
   "reelix-core",
   "qdrant-client",
   "httpx>=0.27.0",
-  "nltk>=3.9.0",
+  "nltk>=3.9.3",
   "rank_bm25",
   "sentence_transformers",
   "joblib",

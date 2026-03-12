@@ -3,7 +3,6 @@ reelix_agent
 reelix_core
 reelix_eval
 reelix_events
-reelix_llm
 reelix_logging
 reelix_models
 reelix_ranking
