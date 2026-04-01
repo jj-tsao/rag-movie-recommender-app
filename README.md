@@ -6,7 +6,7 @@
 [![CE Reranker](https://img.shields.io/badge/CE%20Reranker-HuggingFace-blue?logo=huggingface)](https://huggingface.co/JJTsao/movietv-reranker-cross-encoder-base-v1)
 [![Made with FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi)](https://jjtsao-rag-movie-api.hf.space/docs#/)
 [![Built with React](https://img.shields.io/badge/Frontend-React-61dafb?logo=react)](https://reelixai.netlify.app/)
-![License](https://img.shields.io/github/license/jj-tsao/rag-movie-recommender-app)
+![License](https://img.shields.io/github/license/jj-tsao/reeli)
 
 ---
 
@@ -14,14 +14,14 @@
 
 ---
 
-**Reelix** is an AI-native movie discovery agent that understands your nuanced preferences and evolving taste, and turns them into cinematic picks just for you.
+**Reelix** is an AI-native movie discovery agent that understands your preferred vibe, learns your taste, and recommend films you'll actually love.
 
 Under the hood, Reelix is a multi-agent system with four collaborating AI agents spanning intent understanding & planning, candidate curation, next-step guidance, and fit explanations:
 
-- **Orchestrator Agent**: parses queries, builds a structured retrieval plan, and manages multi-turn session memory
-- **Curator Agent**: scores candidates on genre/tone/theme/structure fit via parallel LLM evaluation
-- **Reflection Agent**: proposes a concrete next-step direction after each recommendation turn
-- **Explanation Agent**: streams personalized “why you’ll enjoy it” rationales to the UI
+1. **Orchestrator Agent**: parses queries, builds a structured retrieval plan, and manages multi-turn session memory
+2. **Curator Agent**: scores candidates on genre, tone, theme, and structural fit via parallel LLM evaluation
+3. **Reflection Agent**: proposes a concrete next-step direction after each recommendation turn
+4. **Explanation Agent**: streams personalized “why you’ll enjoy it” rationales to the UI
 
 The agents are backed by a hybrid recommendation pipeline (dense + sparse retrieval, multi-step reranking) and a user taste vector that evolves with every rating, reaction, and refinement.
 
@@ -247,6 +247,28 @@ The system maintains comprehensive logging across two layers for analysis, debug
 - **Taste vector updates** - Aggregates signals and rebuilds user taste profile
 - **Session memory** - Persists query context, RecQuerySpec, and final_recs to Redis for multi-turn conversations
 - **"Why" explanations** - Cached in Supabase + Redis for reuse and analysis
+
+#### Layer 3: Evaluation Jobs (Data Pipeline)
+
+Automated evaluation that runs on logged data to measure recommendation and explanation quality over time.
+
+**Daily Metrics** (`python -m jobs.eval_metrics`)
+- Computes 20+ metrics across 6 groups from logging tables and upserts to `daily_metrics`:
+  - **Cost**: request count, total input/output tokens, avg tokens per query
+  - **Latency**: end-to-end p50/p95, per-stage p50 (orchestrator, pipeline, curator, reflection)
+  - **Curator quality**: tier distribution (strong/moderate/no_match rates), served ratio, avg fit score, fit-vs-pipeline-score correlation
+  - **Errors**: error rate, error count by stage
+  - **Routing**: CHAT vs RECS mode distribution
+  - **Judge**: aggregated judge scores (if `eval_judge` has run), judge-curator correlation
+- Supports backfills: `--days 7` computes the last 7 days
+
+**LLM-as-Judge** (`python -m jobs.eval_judge`)
+- Samples completed agent queries from a target date and runs two independent LLM judge calls per query:
+  1. **Recommendation quality** (relevance + novelty, 1–5) — evaluates curator picks *without* seeing "why" explanations to avoid bias
+  2. **Explanation quality** (1–5) — evaluates explanation agent output *with* "why" text
+- This separation cleanly isolates curator vs explanation agent quality: if relevance drops, it's the curator; if explanation quality drops, it's the explanation agent
+- Scores persisted to `judge_evaluations` with eval_run_id, curator tier/fit for correlation analysis
+- Configurable: `--sample-size 100 --model gpt-4o-mini`
 
 #### Analysis & Retraining
 - Join `curator_evaluations` with `rec_results` on (query_id, media_id) to analyze fit scores vs. pipeline scores
@@ -528,6 +550,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 This is a **pnpm monorepo** using **Turborepo**:
 - **apps/api** - FastAPI backend (Python 3.11+, managed with `uv`)
 - **apps/web** - React frontend (Vite + TypeScript + Tailwind)
+- **apps/data-pipeline** - ETL, embedding, rating enrichment, and evaluation jobs (Python 3.11+, managed with `uv`)
 - **packages/python** - Shared Python packages (reelix_agent, reelix_core, reelix_ranking, reelix_retrieval, etc.)
 
 ---
