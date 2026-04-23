@@ -10,7 +10,7 @@
 
 ---
 
-👉 Try the **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
+Try the **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
 
 ---
 
