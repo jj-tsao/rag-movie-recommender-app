@@ -1,10 +1,9 @@
 export const EXAMPLE_CHIPS = [
-  "Psychological thrillers with a satirical tone after 2000",
-  "Heartwarming coming-of-age drama on Netflix",
-  "I like Interstellar. What else do you recommend?",
-  "Tell me how this works?",
-  // "Mind-bending, fast-paced sci-fi on HBO and Hulu",
-  "Gritty neo-noirs with stylish actions in the 90s",
+  "Sharp social satire post-2000",
+  "Heartwarming coming-of-age stories on Netflix",
+  "I like Interstellar. What else should I watch?",
+  "Feel-good films for family movie night",
+  "Gritty neo-noirs from the 90s",
   "Playful enemies to lovers rom-coms",
-  "High-stakes espionage adventures from the past 10 years",
+  "High-stakes cerebral espionage",
 ] as const;

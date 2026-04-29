@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /auth/
+Disallow: /taste
+Disallow: /watchlist
+Disallow: /discover/for-you
+
+Sitemap: https://reelixai.netlify.app/sitemap.xml
