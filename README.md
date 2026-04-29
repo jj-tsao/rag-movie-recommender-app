@@ -10,7 +10,7 @@
 
 ---
 
-Try the **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
+👉 Try the **Live Product** here: [**Reelix AI**](https://reelixai.netlify.app/)
 
 ---
 
@@ -144,9 +144,6 @@ This deterministic pipeline executes the `RecQuerySpec` from the orchestrator, r
   - Curator evaluates each candidate on fit dimensions
   - Returns tiered and selected recommendations
 
-- **Fast path to UI**
-  - Returns a **ranked slate with metadata** (titles, posters, scores) via SSE immediately so the frontend can render cards and layout **before** why-copy is ready.
-
 
 ### 3) Curator Agent
 
@@ -171,6 +168,9 @@ This agent evaluates candidates from the recommendation pipeline using LLM reaso
   - Categorizes candidates as: strong_match, moderate_match, or no_match
   - Applies tier-based selection logic to produce final recommendations
   - Returns curated slate to orchestrator for SSE streaming to UI
+
+- **Fast path to UI**
+  - Returns a **ranked slate with metadata** (titles, posters, scores) via SSE immediately so the frontend can render cards and layout **before** why-copy is ready.
 
 
 ### 4) Reflection Agent
