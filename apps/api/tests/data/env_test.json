@@ -1,6 +1,0 @@
-{
-  "QDRANT_ENDPOINT": "http://localhost:6333",
-  "QDRANT_API_KEY": "test_qdrant_key",
-  "SUPABASE_URL": "http://localhost",
-  "SUPABASE_ANON_KEY": "test_anon_key"
-}
