@@ -12,7 +12,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 class TMDBClient:
     BASE_URL = "https://api.themoviedb.org/3"
 
-    def __init__(self, api_key: str, max_connections: int = 15, timeout: float = 10.0):
+    def __init__(self, api_key: str, max_connections: int = 6, timeout: float = 10.0):
         self.api_key = api_key
         limits = httpx.Limits(
             max_connections=max_connections, max_keepalive_connections=max_connections
@@ -23,6 +23,7 @@ class TMDBClient:
             headers={"Accept": "application/json"},
         )
         self.semaphore = asyncio.Semaphore(max_connections)
+        self._pause_until: float = 0.0  # monotonic deadline; all requests wait past this
 
     def build_discover_url(
         self, media_type: str, page: int, rating: float, vote_count: int
@@ -49,13 +50,31 @@ class TMDBClient:
             )
         return url
 
+    async def _wait_if_paused(self) -> None:
+        loop = asyncio.get_event_loop()
+        while True:
+            remaining = self._pause_until - loop.time()
+            if remaining <= 0:
+                return
+            await asyncio.sleep(remaining)
+
+    def _trigger_pause(self, seconds: float) -> None:
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + seconds
+        if deadline > self._pause_until:
+            self._pause_until = deadline
+
     async def get(self, url: str):
         async with self.semaphore:
+            await self._wait_if_paused()
             try:
                 response = await self.client.get(url)
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    retry_after = e.response.headers.get("Retry-After")
+                    return {"__rate_limited__": True, "retry_after": retry_after}
                 print(f"[HTTP Error] {e.response.status_code}: {url}")
             except httpx.RequestError as e:
                 print(f"[Request Error] {e}")
@@ -63,9 +82,23 @@ class TMDBClient:
                 print(f"[Unexpected Error] {e}")
         return None
 
-    async def get_with_retry(self, url: str, retries: int = 2, delay: float = 1.0):
+    async def get_with_retry(self, url: str, retries: int = 5, delay: float = 1.0):
         for attempt in range(retries + 1):
             result = await self.get(url)
+            if isinstance(result, dict) and result.get("__rate_limited__"):
+                if attempt >= retries:
+                    print(f"[Rate Limited — giving up after {retries} retries] {url}")
+                    return None
+                retry_after = result.get("retry_after")
+                try:
+                    sleep_for = float(retry_after) if retry_after else delay * (2**attempt)
+                except (TypeError, ValueError):
+                    sleep_for = delay * (2**attempt)
+                sleep_for = min(max(sleep_for, 1.0), 30.0)
+                # Pause ALL coroutines so the rate-limit window can clear.
+                self._trigger_pause(sleep_for)
+                await self._wait_if_paused()
+                continue
             if result:
                 return result
             if attempt < retries:
