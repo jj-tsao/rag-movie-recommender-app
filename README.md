@@ -230,7 +230,7 @@ After each recommendation turn, the Reflection Agent analyzes the curated slate 
 
 ### 6) Signals, feedback loops & taste updates
 
-The system maintains comprehensive logging across two layers for analysis, debugging, and continuous improvement:
+The system maintains comprehensive logging across two layers — plus live distributed tracing — for analysis, debugging, and continuous improvement:
 
 #### Layer 1: Recommendation Pipeline Logging (All Endpoints)
 - **`rec_queries`** - Query metadata (query_id, filters, user context, timestamp)
@@ -241,6 +241,20 @@ The system maintains comprehensive logging across two layers for analysis, debug
 - **`curator_evaluations`** - Per-candidate fit scores (genre_fit, tone_fit, theme_fit, structure_fit, tier, is_served, final_rank)
 - **`tier_summaries`** - Aggregate statistics (strong/moderate/no_match counts, selection_rule applied, curator latency)
 - **`reflection_logs`** - Reflection agent attempts (strategy, suggestion, status, latency, token counts, tier context)
+
+#### Distributed Tracing (OpenTelemetry)
+
+Alongside the Supabase tables above (which power *batch* evaluation), every request is also emitted as a live **OpenTelemetry trace** for real-time debugging — one connected trace with stage timings and parent/child relationships across the whole agent flow.
+
+- **Auto-instrumentation**: FastAPI (server spans), HTTPX (OpenAI, Qdrant, Supabase calls), Redis.
+- **Stage spans**: `orchestrator.plan` → `recommendation.execute` → `retrieval.hybrid` (`retrieval.dense` / `retrieval.sparse`) → `ranking.multi_stage` → `curator.evaluate` (two parallel `curator.batch`) → `curator.tier_selection` → `reflection.generate`.
+- **LLM spans** (`llm.chat` / `llm.chat_stream`): GenAI semantic conventions (`gen_ai.request.model`, `gen_ai.usage.input_tokens`/`output_tokens`, `gen_ai.response.finish_reasons`) plus `reelix.agent.role` (orchestrator / curator / reflection / explanation) — per-agent cost and latency at a glance.
+- **Reelix attributes**: `reelix.query_id` on the root span, plus stage tags (`reelix.candidates.count`, `reelix.retrieval.*`, `reelix.ranking.*`, `reelix.curator.*`, `reelix.tier.served_strong_count`/`served_moderate_count`, `reelix.reflection.*`).
+- **Supabase ↔ Tempo bridge**: every telemetry row carries `trace_id`/`span_id`, so a flagged row pivots straight to its trace, and an odd trace pivots back to SQL via `reelix.query_id`.
+- **Two-phase linkage**: `/explore` and `/explore/why` are separate root traces joined by a span link + shared `query_id` (the SSE gap between them can be minutes).
+- **Privacy**: prompt/completion text is **off by default** — recorded as span events only when `REELIX_OTEL_RECORD_PROMPTS=1`.
+
+Tracing is **opt-in via env**: with no OTLP endpoint configured it's a no-op (zero overhead). Set `OTEL_EXPORTER_OTLP_ENDPOINT` (+ headers) to export to **Grafana Cloud Tempo** or any OTLP backend.
 
 #### Feedback Loop Integration
 - **User interactions** (Love/Like/Dislike, ratings, watchlist actions, trailer views) logged to Supabase
@@ -485,6 +499,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 | Why Cache | Redis-based why rationale caching (for-you feed reuse) |
 | Chat Completion        | OpenAI API (streamed JSONL/SSE)                      |
 | Movie Metadata         | TMDB (The Movie Database) API                        |
+| Observability          | OpenTelemetry tracing → Grafana Cloud Tempo (OTLP)   |
 | Model Hosting          | Hugging Face Hub                                     |
 | Deployment             | Frontend: Netlify, Backend: Hugging Face Spaces      |
 
@@ -576,6 +591,13 @@ export SUPABASE_URL=...
 export SUPABASE_API_KEY=...
 export OPENAI_API_KEY=...
 export REDIS_URL=...
+
+# Optional: OpenTelemetry tracing (omit entirely to disable — no-op without an endpoint)
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-<region>.grafana.net/otlp
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic%20<base64 of instanceID:token>"
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+# export OTEL_TRACES_EXPORTER=console   # or print spans to stdout instead of exporting
+# export REELIX_OTEL_RECORD_PROMPTS=1   # attach prompt/completion as span events (contains PII)
 
 # Run API server
 uvicorn app.main:app --reload --port 7860
