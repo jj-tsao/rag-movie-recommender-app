@@ -12,7 +12,8 @@ create table if not exists rec_queries (
   ctx_log jsonb,
   pipeline_version text,
   batch_size int not null,
-  request_meta jsonb
+  request_meta jsonb,
+  trace_id text  -- OTel trace id (32-hex) → pivot to Tempo
 );
 
 create index if not exists idx_rec_queries_endpoint_time on rec_queries (endpoint, created_at desc);
@@ -34,7 +35,14 @@ create table if not exists rec_results (
   meta_breakdown jsonb,
   why_summary text,
   stage text not null,
-  source_meta jsonb
+  source_meta jsonb,
+  trace_id text  -- OTel trace id (32-hex) → pivot to Tempo
 );
 create index if not exists idx_rec_results_ep_qid_rank on rec_results (endpoint, query_id, rank);
 create UNIQUE INDEX rec_results_unq_endp_qid_mid ON rec_results (endpoint, query_id, media_id);
+
+-- -----------------------------------------------------------------------------
+-- Migration: OpenTelemetry trace bridge columns (idempotent; safe on existing DBs)
+-- -----------------------------------------------------------------------------
+alter table rec_queries add column if not exists trace_id text;
+alter table rec_results add column if not exists trace_id text;

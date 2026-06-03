@@ -5,7 +5,9 @@ create extension if not exists vector;     -- pgvector for storing user taste ve
 
 -- Trigger for last update time
 create or replace function public.tg_set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = ''
+as $$
 begin
   new.updated_at = now();
   return new;
@@ -13,7 +15,9 @@ end $$;
 
 -- User identity check for RLS
 create or replace function public.is_me(uid uuid)
-returns boolean language sql stable as $$
+returns boolean language sql stable
+set search_path = ''
+as $$
   select uid = auth.uid()
 $$;
 
@@ -239,7 +243,9 @@ create table if not exists public.user_taste_profile (
   primary key (user_id, media_type, model_name)
 );
 create or replace function public.tg_set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql
+set search_path = ''
+as $$
 begin new.updated_at := now(); return new; end $$;
 
 drop trigger if exists user_taste_profile_updated_at on public.user_taste_profile;

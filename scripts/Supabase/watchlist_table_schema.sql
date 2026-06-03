@@ -64,7 +64,9 @@ create index user_watchlist_user_idx
 -- Soft-delete RPC
 create or replace function public.soft_delete_watchlist_row(p_id uuid, p_user_id uuid)
 returns setof public.user_watchlist
-language plpgsql security definer as $$
+language plpgsql security definer
+set search_path = ''
+as $$
 begin
   update public.user_watchlist
      set deleted_at = now(),

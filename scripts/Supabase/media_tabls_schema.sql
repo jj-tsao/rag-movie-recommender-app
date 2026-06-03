@@ -62,3 +62,7 @@ create index if not exists idx_media_ratings_omdb_status
 create index if not exists idx_media_ratings_qdrant_point_missing
   on media_ratings(qdrant_point_missing)
   where qdrant_point_missing = true;
+
+-- RLS: backend-only tables (accessed via service_role, not exposed to frontend)
+alter table media_ids enable row level security;
+alter table media_ratings enable row level security;
