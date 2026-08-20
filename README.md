@@ -14,7 +14,7 @@
 
 ---
 
-**Reelix** is an AI-native movie discovery agent that understands your preferred vibe, learns your taste, and recommend films you'll actually love.
+**Reelix** is an AI-native movie discovery agent that understands your preferred vibe, learns your taste, and recommends films you'll actually love.
 
 Under the hood, Reelix is a multi-agent system with four collaborating AI agents spanning intent understanding & planning, candidate curation, next-step guidance, and fit explanations:
 
@@ -24,6 +24,8 @@ Under the hood, Reelix is a multi-agent system with four collaborating AI agents
 4. **Explanation Agent**: streams personalized “why you’ll enjoy it” rationales to the UI
 
 The agents are backed by a hybrid recommendation pipeline (dense + sparse retrieval, multi-step reranking) and a user taste vector that evolves with every rating, reaction, and refinement.
+
+A fifth agent runs outside the serving path: the [Investigator Agent](docs/design/investigator-agent.md) reads Reelix's own production logs, attributes quality regressions to a single pipeline stage, and proposes verified fixes behind a fenced write path — design note included.
 
 ---
 ## Core Experiences
@@ -565,7 +567,7 @@ User Interactions ──▶ Taste Vector (Long term memory)
 This is a **pnpm monorepo** using **Turborepo**:
 - **apps/api** - FastAPI backend (Python 3.11+, managed with `uv`)
 - **apps/web** - React frontend (Vite + TypeScript + Tailwind)
-- **apps/data-pipeline** - ETL, embedding, rating enrichment, and evaluation jobs (Python 3.11+, managed with `uv`)
+- **apps/jobs** - ETL, embedding, rating enrichment, and evaluation jobs (Python 3.11+, managed with `uv`)
 - **packages/python** - Shared Python packages (reelix_agent, reelix_core, reelix_ranking, reelix_retrieval, etc.)
 
 ---
