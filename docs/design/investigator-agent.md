@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Implemented. Read-only by default; Branching, implementation, and verification gated by `--apply`. |
+| **Status** | Implemented. Read-only by default; branching, implementation, and verification gated by `--apply`. |
 | **Last reviewed** | 2026-08-06 |
 | **Owner** | jj-tsao |
 | **Code** | `packages/python/reelix_eval/agent/` — `run.py` (assembly, safety gate), `tools.py`, `subagents.py`, `prompts.py` |
@@ -16,7 +16,7 @@
 
 ## Summary
 
-The Investigator Agent (built on Claude Agent SDK) reads Reelix's own production logs, attributes a quality regression to a specific stage of the recommendation pipeline, proposes a concrete diff; and, when `apply_mode` is enabled, it branches, implements the fix, and verifies it by replaying a frozen eval set. Finally, the agent writes a report with findings and verified solutions for human review and approval.
+The Investigator Agent (built on Claude Agent SDK) reads Reelix's own production logs, attributes a quality regression to a specific stage of the recommendation pipeline, proposes a concrete diff, and, when `apply_mode` is enabled, it branches, implements the fix, and verifies it by replaying a frozen eval set. Finally, the agent writes a report with findings and verified solutions for human review and approval.
 
 The Investigator's main job is root-cause attribution, solutioning, and verification: **which stage caused it, on the evidence of which specific queries, and what change would fix it; then testing that change against a frozen baseline and handing the human a diff for approval.**
 
@@ -42,7 +42,7 @@ A lead agent (`claude-opus-5`, 60-turn ceiling) plus three context-isolated suba
 
 ```
                         ┌────────────────────────────────────────┐
-   jobs.investigate ───▶│  Investigator (lead)                   │
+   jobs.investigate ───▶│  Investigator (lead agent)             │
                         │  scope · locate/compose code · report  │
                         └───────┬───────────┬────────────┬───────┘
                                 │           │            │
@@ -62,24 +62,24 @@ A lead agent (`claude-opus-5`, 60-turn ceiling) plus three context-isolated suba
 
 ```mermaid
 flowchart TD
-    A[Scope window] --> B[metrics-analyst<br/>triage metrics]
-    B -->|nothing moved| CLEAN[Clean report:<br/>metric summary<br/>no findings]
-    B -->|symptoms found| C[query-inspector xN<br/>attribute to one stage]
-    C --> D[run_judge<br/>fresh sample corroborates]
+    A[Scope window] --> B[metrics-analyst\ntriage metrics]
+    B -->|nothing moved| CLEAN[Clean report:\nmetric summary\nno findings]
+    B -->|symptoms found| C[query-inspector xN \nattribute to one stage]
+    C --> D[run_judge\nfresh sample corroborates]
     D --> E[Locate code, compose diff]
     E --> F{apply_mode?}
 
-    F -->|no| PROP[Proposed report:<br/>findings + evidence<br/>proposed diff, unverified]
+    F -->|no| PROP[Proposed report:\nfindings + evidence\nproposed diff, unverified]
 
-    F -->|yes| G[snapshot_evalset<br/>freeze replay baseline]
+    F -->|yes| G[snapshot_evalset\nfreeze replay baseline]
     G --> H[Branch + edit]
-    H --> I[fix-verifier<br/>replay_curator, score_replay]
+    H --> I[fix-verifier\nreplay_curator, score_replay]
 
-    I -->|verified gain| VER[Verified report:<br/>findings + evidence<br/>diff on branch<br/>replay result vs baseline<br/>recommend merge]
-    I -->|within noise, no gain| ATT[Attempted report:<br/>findings + evidence<br/>diff on branch<br/>replay result vs baseline<br/>recommend do not merge]
+    I -->|verified gain| VER[Verified report:\nfindings + evidence\ndiff on branch\nreplay result vs baseline\nrecommend merge]
+    I -->|within noise, no gain| ATT[Attempted report:\nfindings + evidence\ndiff on branch\nreplay result vs baseline\nrecommend do not merge]
 
     H -.->|every write call| GATE[can_use_tool gate]
-    GATE -.->|push, remote: denied in all modes| X[Refused:<br/>call denied, run continues   ]
+    GATE -.->|push, remote: denied in all modes| X[Refused:\ncall denied, run continues   ]
 
     classDef gate stroke-dasharray: 4 3
     class GATE,X gate
@@ -99,7 +99,6 @@ flowchart TD
 | The production system under test stays on OpenAI; the eval layer runs on Claude | Single model provider | Judge and curator sharing a model family means sharing blind spots. Cross-provider evaluation keeps the two independent, and lets each side pick per role (`gpt-4.1-mini` for latency-sensitive serving, `claude-sonnet-5` for eval judgements, `claude-opus-5` for Investigator reasoning). Curator replay still calls OpenAI, since the replay must reproduce the system as it actually runs.
 | **Sonnet 5** as default eval judge, chosen by A/B against Opus 5. **Opus 5** handles the agent's core reasoning. | Opus 5 everywhere; or Haiku 4.5 for cost | Sonnet tracks Opus closely enough to trust (r=0.81 on relevance, 95% of items within one point, identical `spec_violation` calls) at ~30% of the cost. Haiku 4.5 was rejected: novelty correlation drops to 0.52 and it grades systematically easier. Opus is retained as a periodic recalibration reference. |
 | The eval judge calls Claude's Messages API directly from an in-process tool, while the Investigator agent runs on Claude Agent SDK | Delegate judging to a subagent | An eval score has to be a typed row in `judge_evaluations`, not prose. `messages.parse()` validates against the pydantic schema before the result is returned; a subagent would return free text that needs re-parsing, with no guarantee it holds the rubric's shape. The same code path then serves both the agent's `run_judge tool` and the batch `jobs.eval_judge` with no agent involved. Running in-process also means the call bills to `REELIX_JUDGE_ANTHROPIC_KEY`, keeping judge spend separate and measurable from agent spend.
-| Write tools **never** listed in `allowed_tools`, in either mode | List `Edit`/`Write`/`Bash` under `--apply` | Listing a tool there auto-approves it *before* `can_use_tool` runs — silently bypassing the entire guard, including the unconditional push denial. Omitting them forces every call through the callback. The SDK raises `CanUseToolShadowedWarning` if this regresses. |
 | Judge uses structured outputs with `Literal[1..5]` scores | Bare `json.loads` with a fallback | The v1.0 judge silently fell back to `{}` on a malformed response, scoring every candidate `None` — which in aggregate looked exactly like a quality regression. `Literal` rather than `Field(ge=…, le=…)` because structured outputs enforce `enum` server-side but strip numeric constraints. |
 | Judge key is `REELIX_JUDGE_ANTHROPIC_KEY` | Reuse `ANTHROPIC_API_KEY` | That name resolves first for both the Anthropic SDK and the Claude Code CLI, so exporting it would silently move every agent turn off plan credit onto pay-as-you-go. Preflight *fails the run* if it's set. |
 | Two independent judge calls; recommendation quality judged **blind** to the "why" text | One call scoring everything | A persuasive explanation must not be able to rescue a bad pick. Relevance drops → curator. Explanation quality drops → explanation agent. Stage attribution again. |
@@ -107,14 +106,15 @@ flowchart TD
 | Tools run **in-process**, not in the SDK subprocess | Separate MCP server | Anything a tool calls is billed to that code's own credential. Deliberate for `run_judge`: judge spend stays separate and measurable from agent spend. |
 | `compare_windows` aggregates **live** from the logging tables | Read `daily_metrics` | `daily_metrics` is only written when the batch job runs. Live aggregation allows a comparison to run on any window without depending on a job having run. |
 | `setting_sources=[]` | Inherit `~/.claude` and repo settings | A run's configuration is explicit. Unrelated local config cannot silently change what an investigation is allowed to do. |
-| Noise floor stated in the prompt as numbers | Leave it to judgement | The curator runs at `temperature=0.1`, so an *unchanged* replay reproduces only ~0.80 served overlap and tier counts wander ±0.25 run to run. The prompt gives the agent the threshold: under ~0.3 on a 1–5 axis, say "within noise" and mean it. |
 | No prompt caching on judge rubrics | Pad the rubrics past the cacheable minimum | Both system prompts sit below it (rec 920 / expl 400 tokens; Sonnet 5 needs 1024). Verified no-op: repeated calls report zero cache reads. Padding a rubric with filler would save ~$0.37/month and make the prompt worse. |
 
 ---
 
-## Evidence Standards
+## Evidence standards
 
 Encoded in the agent prompt as standards that explicitly outrank completing the workflow.
+
+**Movement under the noise floor is noise.** The curator runs at `temperature=0.1`, so replaying an unchanged eval set reproduces only ~0.80 served overlap and tier counts wander ±0.25 run to run. The prompt gives the agent the measured threshold: under ~0.3 on a 1–5 axis, report "within noise" and stop there.
 
 **Evidence is query IDs and numbers.** Every claim names the queries it rests on. A hypothesis that couldn't be checked against real queries is labelled low-confidence, not stated as fact.
 
@@ -135,6 +135,7 @@ The agent's commit rights are fenced in layers:
 
 - **Read-only by default.** `Edit`, `Write`, and `Bash` sit in `disallowed_tools` — not merely denied per call, but uninvokable.
 - **`--apply` opens edits, never the remote.** `push`, `remote`, `fetch`, `pull`, `clone`, and `submodule` are denied unconditionally, in every mode. Publishing is a gated human action.
+- **Write tools are never listed in `allowed_tools`.** Listing a tool there auto-approves it *before* `can_use_tool` runs, which would bypass the guard entirely. Omitting them forces every `Edit`, `Write`, and `Bash` call through the callback.
 - **Forbidden verbs checked before the allowlist**, so a banned verb can't slip through as an argument to a permitted one.
 - **No shell composition.** `||`, `&&`, `;`, `|`, newlines, backticks, and `$(…)` are rejected outright — an allowed prefix must not be able to carry a forbidden payload.
 - **Only `git`**, and only from a fixed allowlist. `checkout` is restricted to `-b <branch>` so it can't discard working-tree changes.
