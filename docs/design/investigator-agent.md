@@ -92,25 +92,7 @@ flowchart TD
 
 ---
 
-## Key design decisions
-
-| Decision | Alternative | Why |
-|---|---|---|
-| The production system under test stays on OpenAI; the eval layer runs on Claude | Single model provider | Judge and curator sharing a model family means sharing blind spots. Cross-provider evaluation keeps the two independent, and lets each side pick per role (`gpt-4.1-mini` for latency-sensitive serving, `claude-sonnet-5` for eval judgements, `claude-opus-5` for Investigator reasoning). Curator replay still calls OpenAI, since the replay must reproduce the system as it actually runs.
-| **Sonnet 5** as default eval judge, chosen by A/B against Opus 5. **Opus 5** handles the agent's core reasoning. | Opus 5 everywhere; or Haiku 4.5 for cost | Sonnet tracks Opus closely enough to trust (r=0.81 on relevance, 95% of items within one point, identical `spec_violation` calls) at ~30% of the cost. Haiku 4.5 was rejected: novelty correlation drops to 0.52 and it grades systematically easier. Opus is retained as a periodic recalibration reference. |
-| The eval judge calls Claude's Messages API directly from an in-process tool, while the Investigator agent runs on Claude Agent SDK | Delegate judging to a subagent | An eval score has to be a typed row in `judge_evaluations`, not prose. `messages.parse()` validates against the pydantic schema before the result is returned; a subagent would return free text that needs re-parsing, with no guarantee it holds the rubric's shape. The same code path then serves both the agent's `run_judge tool` and the batch `jobs.eval_judge` with no agent involved. Running in-process also means the call bills to `REELIX_JUDGE_ANTHROPIC_KEY`, keeping judge spend separate and measurable from agent spend.
-| Judge uses structured outputs with `Literal[1..5]` scores | Bare `json.loads` with a fallback | The v1.0 judge silently fell back to `{}` on a malformed response, scoring every candidate `None` — which in aggregate looked exactly like a quality regression. `Literal` rather than `Field(ge=…, le=…)` because structured outputs enforce `enum` server-side but strip numeric constraints. |
-| Judge key is `REELIX_JUDGE_ANTHROPIC_KEY` | Reuse `ANTHROPIC_API_KEY` | That name resolves first for both the Anthropic SDK and the Claude Code CLI, so exporting it would silently move every agent turn off plan credit onto pay-as-you-go. Preflight *fails the run* if it's set. |
-| Two independent judge calls; recommendation quality judged **blind** to the "why" text | One call scoring everything | A persuasive explanation must not be able to rescue a bad pick. Relevance drops → curator. Explanation quality drops → explanation agent. Stage attribution again. |
-| Batch API for `jobs.eval_judge`, synchronous for the agent's `run_judge` | One path for both | Batch is half price ($0.0195 vs $0.0380 per query) but takes minutes. The batch job can wait (not time-sensitive); an agent mid-investigation is low volume but time-sensitive. |
-| Tools run **in-process**, not in the SDK subprocess | Separate MCP server | Anything a tool calls is billed to that code's own credential. Deliberate for `run_judge`: judge spend stays separate and measurable from agent spend. |
-| `compare_windows` aggregates **live** from the logging tables | Read `daily_metrics` | `daily_metrics` is only written when the batch job runs. Live aggregation allows a comparison to run on any window without depending on a job having run. |
-| `setting_sources=[]` | Inherit `~/.claude` and repo settings | A run's configuration is explicit. Unrelated local config cannot silently change what an investigation is allowed to do. |
-| No prompt caching on judge rubrics | Pad the rubrics past the cacheable minimum | Both system prompts sit below it (rec 920 / expl 400 tokens; Sonnet 5 needs 1024). Verified no-op: repeated calls report zero cache reads. Padding a rubric with filler would save ~$0.37/month and make the prompt worse. |
-
----
-
-## Evidence standards
+## Investigation Standards
 
 Encoded in the agent prompt as standards that explicitly outrank completing the workflow.
 
@@ -143,6 +125,24 @@ The agent's commit rights are fenced in layers:
 - **Preflight blocks the run** on a shadowing `ANTHROPIC_API_KEY`, a missing judge key, or (under `--apply`) a dirty tree that would get mixed into the fix branch.
 
 Streaming input is mandatory rather than optional here: the SDK requires it whenever `can_use_tool` is set, and that callback is the whole safety story.
+
+---
+
+## Key design decisions
+
+| Decision | Alternative | Why |
+|---|---|---|
+| The production system under test stays on OpenAI; the eval layer runs on Claude | Single model provider | Judge and curator sharing a model family means sharing blind spots. Cross-provider evaluation keeps the two independent, and lets each side pick per role (`gpt-4.1-mini` for latency-sensitive serving, `claude-sonnet-5` for eval judgements, `claude-opus-5` for Investigator reasoning). Curator replay still calls OpenAI, since the replay must reproduce the system as it actually runs.
+| **Sonnet 5** as default eval judge, chosen by A/B against Opus 5. **Opus 5** handles the agent's core reasoning. | Opus 5 everywhere; or Haiku 4.5 for cost | Sonnet tracks Opus closely enough to trust (r=0.81 on relevance, 95% of items within one point, identical `spec_violation` calls) at ~30% of the cost. Haiku 4.5 was rejected: novelty correlation drops to 0.52 and it grades systematically easier. Opus is retained as a periodic recalibration reference. |
+| The eval judge calls Claude's Messages API directly from an in-process tool, while the Investigator agent runs on Claude Agent SDK | Delegate judging to a subagent | An eval score has to be a typed row in `judge_evaluations`, not prose. `messages.parse()` validates against the pydantic schema before the result is returned; a subagent would return free text that needs re-parsing, with no guarantee it holds the rubric's shape. The same code path then serves both the agent's `run_judge tool` and the batch `jobs.eval_judge` with no agent involved. Running in-process also means the call bills to `REELIX_JUDGE_ANTHROPIC_KEY`, keeping judge spend separate and measurable from agent spend.
+| Judge uses structured outputs with `Literal[1..5]` scores | Bare `json.loads` with a fallback | The v1.0 judge silently fell back to `{}` on a malformed response, scoring every candidate `None` — which in aggregate looked exactly like a quality regression. `Literal` rather than `Field(ge=…, le=…)` because structured outputs enforce `enum` server-side but strip numeric constraints. |
+| Judge key is `REELIX_JUDGE_ANTHROPIC_KEY` | Reuse `ANTHROPIC_API_KEY` | That name resolves first for both the Anthropic SDK and the Claude Code CLI, so exporting it would silently move every agent turn off plan credit onto pay-as-you-go. Preflight *fails the run* if it's set. |
+| Two independent judge calls; recommendation quality judged **blind** to the "why" text | One call scoring everything | A persuasive explanation must not be able to rescue a bad pick. Relevance drops → curator. Explanation quality drops → explanation agent. Stage attribution again. |
+| Batch API for `jobs.eval_judge`, synchronous for the agent's `run_judge` | One path for both | Batch is half price ($0.0195 vs $0.0380 per query) but takes minutes. The batch job can wait (not time-sensitive); an agent mid-investigation is low volume but time-sensitive. |
+| Tools run **in-process**, not in the SDK subprocess | Separate MCP server | Anything a tool calls is billed to that code's own credential. Deliberate for `run_judge`: judge spend stays separate and measurable from agent spend. |
+| `compare_windows` aggregates **live** from the logging tables | Read `daily_metrics` | `daily_metrics` is only written when the batch job runs. Live aggregation allows a comparison to run on any window without depending on a job having run. |
+| `setting_sources=[]` | Inherit `~/.claude` and repo settings | A run's configuration is explicit. Unrelated local config cannot silently change what an investigation is allowed to do. |
+| No prompt caching on judge rubrics | Pad the rubrics past the cacheable minimum | Both system prompts sit below it (rec 920 / expl 400 tokens; Sonnet 5 needs 1024). Verified no-op: repeated calls report zero cache reads. Padding a rubric with filler would save ~$0.37/month and make the prompt worse. |
 
 ---
 
