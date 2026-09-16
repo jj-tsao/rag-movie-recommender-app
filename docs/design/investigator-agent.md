@@ -24,7 +24,7 @@ The Investigator's main job is root-cause attribution, solutioning, and verifica
 
 ## What problem does it solve?
 
-Reelix has two existing evaluation layers. The batched **LLM-as-a-judge eval** (`jobs.eval_judge`) samples completed queries and scores them on relevance, novelty, spec fidelity, list coherence, and explanation quality. **Distributed tracing** (OTel, surfaced in Grafana) gives per-request stage timing and metadata. Together they are sufficient for detection but inefficient for diagnosis and mitigation. 
+Reelix has two existing evaluation layers. The batched **LLM-as-a-judge eval** (`jobs.eval_judge`) samples completed queries and scores them on relevance, novelty, spec fidelity, list coherence, and explanation quality. **Distributed tracing** (OTel, surfaced in Grafana) gives per-request stage timing and metadata. Together they are sufficient for detection but inefficient for diagnosis and mitigation.
 
 Investigating a regression means a human reading query logs and traces, attributing the root cause to a pipeline stage, composing a candidate fix, and verifying it by hand. 1–2 hours of effort per regression.
 
@@ -58,7 +58,7 @@ A lead agent (`claude-opus-5`, 60-turn ceiling) plus three context-isolated suba
                            └─────────────────────────────────┘
 ```
 
-**Agent Workflow** 
+**Agent Workflow**
 
 ```mermaid
 flowchart TD
@@ -85,9 +85,9 @@ flowchart TD
     class GATE,X gate
 ```
 
-**Why subagents?** 
-* Measured tool output: `get_query_detail` **~2.5k each**. A `query-inspector` reading ten queries absorbs ~25k tokens of raw material. Accumulating it in the lead's window would crowd out the reasoning that needs the room. 
-* The `metrics-analyst` split is *not* about size (`compare_windows` at 1.4k is negligible), and more about ownership: its ranked shortlist is a judgement call, and the lead should receive that independent judgement rather than forming its own from the same numbers. 
+**Why subagents?**
+* Measured tool output: `get_query_detail` **~2.5k each**. A `query-inspector` reading ten queries absorbs ~25k tokens of raw material. Accumulating it in the lead's window would crowd out the reasoning that needs the room.
+* The `metrics-analyst` split is *not* about size (`compare_windows` at 1.4k is negligible), and more about ownership: its ranked shortlist is a judgement call, and the lead should receive that independent judgement rather than forming its own from the same numbers.
 * The same ownership consideration goes to `fix-verifier`: replaying and verifying fixes needs to be a standalone judgement. Only the conclusions are reported back to the lead.
 
 ---
@@ -159,7 +159,7 @@ These live in code as `STANDING_BLIND_SPOTS` (`report.py`) and are emitted into 
 ## Open tasks
 
 - **Ad-hoc, not scheduled.** Whether this should run nightly on a fixed window or only on demand after a metric alert is unresolved. Nightly runs cost turns and produce mostly clean reports, which is exactly the condition under which nobody reads them.
-- **The tier heuristic is hand-written.** `_classify_curator_category` could probably be a learned cross-encoder re-ranker in the long run should latency allows; the Investigator can currently only propose threshold tweaks to it.
+- **The tier heuristic is hand-written.** `_classify_curator_category` could probably be a learned cross-encoder re-ranker in the long run should latency allow; the Investigator can currently only propose threshold tweaks to it.
 - **Reflection is not measured.** The judge scores the orchestrator, curator, and explanation agent. Reflection strategy quality has telemetry (`reflection_logs`) but no rubric or eval yet, so the Investigator cannot attribute a cross-turn finding to it at this point.
 
 ---
